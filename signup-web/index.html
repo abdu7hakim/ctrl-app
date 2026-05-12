@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTRL - Control Your Life</title>
+    <meta name="description"
+        content="CTRL - Your personal productivity dashboard. Track habits, manage tasks, and take control of your life.">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Notification Panel Overlay -->
+    <div class="notif-overlay" id="notifOverlay"></div>
+    <div class="notif-panel" id="notifPanel">
+        <div class="notif-panel-header">
+            <h3>Notifications</h3>
+            <button class="notif-clear-btn" id="notifClearBtn">Clear all</button>
+        </div>
+        <div class="notif-panel-list" id="notifPanelList">
+            <div class="notif-panel-empty">
+                <i class="ph ph-bell-slash"></i>
+                <p>No notifications yet</p>
+            </div>
+        </div>
+    </div>
+    <!-- ============================================= -->
+    <!-- SIGNUP PAGE -->
+    <!-- ============================================= -->
+    <div class="page page-signup active" id="signupPage">
+        <div class="split-layout">
+            <!-- Left Panel: Branding / Image -->
+            <div class="panel-left">
+                <div class="panel-left-content">
+                    <div class="brand">
+                        <h2>CTRL App</h2>
+                    </div>
+                    <div class="hero-text">
+                        <h1>Control Your Life</h1>
+                    </div>
+                    <div class="dev-credit">
+                        <p>Development credit</p>
+                        <p><strong>@abdu7hakim@gmail.com</strong></p>
+                    </div>
+                </div>
+                <!-- Background Image via CSS -->
+                <div class="bg-image"></div>
+            </div>
+
+            <!-- Right Panel: Form -->
+            <div class="panel-right">
+                <div class="auth-container">
+                    <!-- SIGNUP SECTION -->
+                    <div id="signupSection">
+                        <div class="auth-header">
+                            <h2>Create Your Account</h2>
+                            <p>Already have an account? <a href="#" id="showLoginLink">Log in</a></p>
+                        </div>
+
+                        <form class="auth-form" id="signupForm">
+                            <div class="form-row">
+                                <div class="input-group">
+                                    <i class="ph ph-user"></i>
+                                    <input type="text" id="firstName" placeholder="First Name" required>
+                                </div>
+                                <div class="input-group">
+                                    <i class="ph ph-user"></i>
+                                    <input type="text" id="lastName" placeholder="Last Name" required>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <i class="ph ph-envelope"></i>
+                                <input type="email" id="email" placeholder="E-mail Address" required>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="input-group">
+                                    <i class="ph ph-lock"></i>
+                                    <input type="password" id="password" placeholder="Password" required>
+                                </div>
+                                <div class="input-group">
+                                    <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+                                    <button type="button" class="toggle-password" id="togglePasswordVisibility">
+                                        <i class="ph ph-eye-slash" id="eyeIcon"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <label class="checkbox-group">
+                                <input type="checkbox" id="terms" required>
+                                <span class="checkmark"></span>
+                                <span class="terms-text">I agree to the <a href="#">Terms &amp; Conditions</a></span>
+                            </label>
+
+                            <button type="submit" class="btn-primary" id="submitBtn">
+                                Create account
+                            </button>
+                        </form>
+
+                        <div class="divider">
+                            <span>Or register with</span>
+                        </div>
+
+                        <div class="social-login">
+                            <button class="btn-social">
+                                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Logo"
+                                    class="social-icon">
+                                Continue with Google
+                            </button>
+                            <button class="btn-social">
+                                <i class="ph-fill ph-apple-logo social-icon"></i>
+                                Continue with Apple
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LOGIN SECTION -->
+                    <div id="loginSection" style="display:none;">
+                        <div class="auth-header">
+                            <h2>Welcome Back</h2>
+                            <p>Don't have an account? <a href="#" id="showSignupLink">Sign up</a></p>
+                        </div>
+
+                        <form class="auth-form" id="loginForm">
+                            <div class="input-group">
+                                <i class="ph ph-envelope"></i>
+                                <input type="email" id="loginEmail" placeholder="E-mail Address" required>
+                            </div>
+
+                            <div class="input-group">
+                                <i class="ph ph-lock"></i>
+                                <input type="password" id="loginPassword" placeholder="Password" required>
+                            </div>
+
+                            <button type="submit" class="btn-primary" id="loginSubmitBtn">
+                                Log In
+                            </button>
+                        </form>
+
+                        <div class="divider">
+                            <span>Or log in with</span>
+                        </div>
+
+                        <div class="social-login">
+                            <button class="btn-social">
+                                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google Logo"
+                                    class="social-icon">
+                                Continue with Google
+                            </button>
+                            <button class="btn-social">
+                                <i class="ph-fill ph-apple-logo social-icon"></i>
+                                Continue with Apple
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================= -->
+    <!-- DASHBOARD PAGE -->
+    <!-- ============================================= -->
+    <div class="page page-dashboard" id="dashboardPage">
+        <div class="dashboard-layout">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-top">
+                    <div class="sidebar-brand">
+                        <span class="sidebar-logo">CTRL</span>
+                    </div>
+                    <nav class="sidebar-nav">
+                        <a href="#" class="nav-item active" data-page="dashboard" id="navDashboard">
+                            <i class="ph ph-house"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="#" class="nav-item" data-page="profile" id="navProfile">
+                            <i class="ph ph-user"></i>
+                            <span>Profile</span>
+                        </a>
+                        <a href="#" class="nav-item" data-page="todo" id="navTodo">
+                            <i class="ph ph-list-checks"></i>
+                            <span>To-Do List</span>
+                        </a>
+                        <a href="#" class="nav-item" data-page="focus" id="navFocus">
+                            <i class="ph ph-timer"></i>
+                            <span>Focus Time</span>
+                        </a>
+                        <a href="#" class="nav-item" data-page="habits" id="navHabits">
+                            <i class="ph ph-calendar-check"></i>
+                            <span>Habit Tracker</span>
+                        </a>
+                        <a href="#" class="nav-item" data-page="contact" id="navContact">
+                            <i class="ph ph-phone"></i>
+                            <span>Contact</span>
+                        </a>
+                    </nav>
+                </div>
+                <div class="sidebar-bottom">
+                    <a href="#" class="nav-item nav-logout" id="logoutBtn">
+                        <i class="ph ph-sign-out"></i>
+                        <span>Log out</span>
+                    </a>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="dashboard-main">
+                <!-- Top Bar -->
+                <header class="dashboard-topbar">
+                    <div class="topbar-left">
+                        <button class="sidebar-toggle" id="sidebarToggle">
+                            <i class="ph ph-list"></i>
+                        </button>
+                        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                    </div>
+                    <div class="topbar-right">
+                        <div class="search-box" id="searchBox">
+                            <i class="ph ph-magnifying-glass"></i>
+                            <input type="text" placeholder="Search..." id="searchInput">
+                        </div>
+                        <!-- Dark Mode Toggle -->
+                        <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">
+                            <i class="ph ph-sun" id="darkModeIcon"></i>
+                        </button>
+                        <button class="topbar-icon-btn" id="notifBtn">
+                            <i class="ph ph-bell"></i>
+                            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                        </button>
+                        <div class="user-avatar" id="suserAvatar">
+                            <img class="avatar-img" id="avatarImg"
+                                style="display:none; width:100%; height:100%; border-radius:50%; object-fit:cover;"
+                                alt="Profile">
+                            <span class="avatar-initials" id="avatarInitials">AH</span>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Dashboard Content -->
+                <div class="dashboard-content">
+                    <!-- Filters Row -->
+                    <div class="filters-row">
+                        <div class="time-filters">
+                            <button class="filter-btn" data-filter="day">Day</button>
+                            <button class="filter-btn" data-filter="week">Week</button>
+                            <button class="filter-btn active" data-filter="month">Month</button>
+                            <button class="filter-btn" data-filter="year">Year</button>
+                        </div>
+                        <div class="date-range">
+                            <i class="ph ph-calendar-blank"></i>
+                            <span id="dateRangeText">1 Apr 2026 – 30 Apr 2026</span>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <!-- Focus Score -->
+                        <div class="stat-card" id="focusScoreCard">
+                            <div class="stat-label">Focus Score</div>
+                            <div class="stat-value">0<span class="stat-unit">/100</span></div>
+                            <div class="stat-trend neutral">
+                                <span>No data yet</span>
+                            </div>
+                        </div>
+                        <!-- Tasks Completed -->
+                        <div class="stat-card" id="tasksCompletedCard">
+                            <div class="stat-label">Tasks Completed</div>
+                            <div class="stat-value">0 <span class="stat-highlight">(0%)</span></div>
+                            <div class="stat-trend neutral">
+                                <span>Start adding tasks</span>
+                            </div>
+                        </div>
+                        <!-- Mini Calendar -->
+                        <div class="stat-card calendar-card" id="miniCalendarCard">
+                            <div class="calendar-header">
+                                <button class="cal-nav" id="calPrev"><i class="ph ph-caret-left"></i></button>
+                                <span class="cal-month" id="calMonthLabel">April 2026</span>
+                                <button class="cal-nav" id="calNext"><i class="ph ph-caret-right"></i></button>
+                            </div>
+                            <div class="calendar-days" id="calendarDays">
+                                <div class="cal-day-label">Mon</div>
+                                <div class="cal-day-label">Tue</div>
+                                <div class="cal-day-label">Wed</div>
+                                <div class="cal-day-label">Thu</div>
+                                <div class="cal-day-label">Fri</div>
+                                <div class="cal-day-label">Sat</div>
+                                <div class="cal-day-label">Sun</div>
+                            </div>
+                            <div class="calendar-grid" id="calendarGrid">
+                                <!-- Filled by JS -->
+                            </div>
+                        </div>
+                        <!-- Streak Count -->
+                        <div class="stat-card" id="streakCard">
+                            <div class="stat-label">Streak Count</div>
+                            <div class="stat-value">0 <span class="stat-unit">days</span></div>
+                            <div class="stat-trend neutral">
+                                <span>Start a streak!</span>
+                            </div>
+                        </div>
+                        <!-- Digital Detox -->
+                        <div class="stat-card" id="detoxCard">
+                            <div class="stat-label">Digital Detox Time</div>
+                            <div class="stat-value">0 <span class="stat-unit">h 0m</span></div>
+                            <div class="stat-trend neutral">
+                                <span>Track your screen-free time</span>
+                            </div>
+                        </div>
+                        <!-- Habit Completion -->
+                        <div class="stat-card habit-completion-card" id="habitCompletionCard">
+                            <div class="habit-completion-info">
+                                <div class="stat-label">Habit Completion</div>
+                                <div class="stat-trend neutral">0% out of 100</div>
+                            </div>
+                            <div class="habit-ring-wrapper">
+                                <svg class="habit-ring" width="68" height="68" viewBox="0 0 68 68">
+                                    <circle cx="34" cy="34" r="28" stroke="#EBEBEB" stroke-width="5" fill="none" />
+                                    <circle cx="34" cy="34" r="28" stroke="#6B4CE6" stroke-width="5" fill="none"
+                                        stroke-dasharray="175.93" stroke-dashoffset="175.93" stroke-linecap="round"
+                                        transform="rotate(-90 34 34)" class="habit-ring-progress" />
+                                </svg>
+                                <span class="habit-ring-label">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Habits Log -->
+                    <div class="habits-log-section">
+                        <h2 class="section-title">Recent Habits Log</h2>
+                        <div class="habits-table-wrapper">
+                            <table class="habits-table" id="habitsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Habit Name</th>
+                                        <th>Duration/Measure</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="habitsTableBody">
+                                    <tr class="habits-empty-row">
+                                        <td colspan="3"
+                                            style="text-align:center; padding:2rem 1rem; color:var(--text-secondary);">
+                                            <i class="ph ph-clipboard-text"
+                                                style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:var(--border-color);"></i>
+                                            No habits tracked yet
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================= -->
+                <!-- PROFILE CONTENT (inside dashboard-main)       -->
+                <!-- ============================================= -->
+                <div class="dashboard-content profile-content" id="profileContent" style="display:none;">
+                    <div class="profile-layout">
+                        <!-- Profile Sidebar -->
+                        <div class="profile-sidebar">
+                            <div class="profile-user-info">
+                                <div class="profile-avatar-large" id="profileAvatarLarge">
+                                    <img class="profile-avatar-img" id="profileAvatarImg"
+                                        style="display:none; width:100%; height:100%; border-radius:50%; object-fit:cover;"
+                                        alt="Profile">
+                                    <span class="profile-avatar-initials" id="profileAvatarInitials">AH</span>
+                                </div>
+                                <div class="profile-user-name" id="profileUserName">User Name</div>
+                            </div>
+
+                            <div class="profile-nav-section">
+                                <div class="profile-nav-label">Your account</div>
+                                <a href="#" class="profile-nav-item active" data-tab="profile-info" id="tabProfile">
+                                    <i class="ph ph-user-circle"></i>
+                                    <span>Profile</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="preferences" id="tabPreferences">
+                                    <i class="ph ph-sliders-horizontal"></i>
+                                    <span>Preferences</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="notifications" id="tabNotifications">
+                                    <i class="ph ph-bell-ringing"></i>
+                                    <span>Notifications</span>
+                                </a>
+                            </div>
+
+                            <div class="profile-nav-section">
+                                <div class="profile-nav-label">Workspace</div>
+                                <a href="#" class="profile-nav-item" data-tab="general" id="tabGeneral">
+                                    <i class="ph ph-gear"></i>
+                                    <span>General</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="members" id="tabMembers">
+                                    <i class="ph ph-users-three"></i>
+                                    <span>Members</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="groups" id="tabGroups">
+                                    <i class="ph ph-folder"></i>
+                                    <span>Groups</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="phone" id="tabPhone">
+                                    <i class="ph ph-device-mobile"></i>
+                                    <span>Phone numbers</span>
+                                </a>
+                                <a href="#" class="profile-nav-item" data-tab="contacts" id="tabContacts">
+                                    <i class="ph ph-address-book"></i>
+                                    <span>Contacts</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Profile Main Content -->
+                        <div class="profile-main">
+                            <h2 class="profile-page-title">Account</h2>
+
+                            <!-- Profile Picture Section -->
+                            <div class="profile-picture-section">
+                                <div class="profile-picture-avatar" id="profilePicAvatar">
+                                    <img class="profile-pic-img" id="profilePicImg"
+                                        style="display:none; width:100%; height:100%; border-radius:50%; object-fit:cover;"
+                                        alt="Profile">
+                                    <span class="profile-pic-initials" id="profilePicInitials">AH</span>
+                                </div>
+                                <div class="profile-picture-info">
+                                    <div class="profile-picture-title">Profile Picture</div>
+                                    <div class="profile-picture-actions">
+                                        <input type="file" id="profilePhotoInput"
+                                            accept="image/png,image/jpeg,image/gif" style="display:none;">
+                                        <button class="btn-outline" id="updatePhotoBtn">
+                                            <i class="ph ph-upload-simple"></i>
+                                            Update Photo
+                                        </button>
+                                        <button class="btn-outline btn-outline-danger" id="deletePhotoBtn">
+                                            <i class="ph ph-trash"></i>
+                                            Delete Photo
+                                        </button>
+                                    </div>
+                                    <p class="profile-picture-hint">We support PNGs, JPEGs and GIFs under 10MB</p>
+                                </div>
+                            </div>
+
+                            <!-- Name Fields -->
+                            <div class="profile-form">
+                                <div class="profile-form-row">
+                                    <div class="profile-field">
+                                        <label class="profile-label">First Name</label>
+                                        <input type="text" class="profile-input" id="profileFirstName" value=""
+                                            placeholder="First Name">
+                                    </div>
+                                    <div class="profile-field">
+                                        <label class="profile-label">Last Name</label>
+                                        <input type="text" class="profile-input" id="profileLastName" value=""
+                                            placeholder="Last Name">
+                                    </div>
+                                </div>
+                                <div class="profile-field">
+                                    <label class="profile-label">Email</label>
+                                    <input type="email" class="profile-input" id="profileEmail" value=""
+                                        placeholder="your@email.com">
+                                </div>
+                            </div>
+
+                            <!-- Productivity Stats -->
+                            <div class="productivity-stats-section">
+                                <h3 class="productivity-stats-title">My Productivity Stats</h3>
+                                <div class="productivity-stats-grid">
+                                    <div class="prod-stat">
+                                        <div class="prod-stat-value" id="prodFocusScore">0%</div>
+                                        <div class="prod-stat-label">Monthly Focus Score</div>
+                                    </div>
+                                    <div class="prod-stat prod-stat-bordered">
+                                        <div class="prod-stat-value" id="prodCompletedGoals">0</div>
+                                        <div class="prod-stat-label">Completed Goals</div>
+                                    </div>
+                                    <div class="prod-stat">
+                                        <div class="prod-stat-value" id="prodCurrentStreak">0d</div>
+                                        <div class="prod-stat-label">Current Streak</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Password Section -->
+                            <div class="password-section">
+                                <div class="password-info">
+                                    <div class="password-title">Password</div>
+                                    <div class="password-subtitle">Click to modify</div>
+                                </div>
+                                <button class="btn-outline" id="changePasswordBtn">
+                                    Change Password
+                                </button>
+                            </div>
+
+                            <!-- Change Password Modal -->
+                            <div class="password-modal-overlay" id="passwordModalOverlay" style="display:none;">
+                                <div class="password-modal" id="passwordModal">
+                                    <div class="password-modal-header">
+                                        <h3><i class="ph ph-lock-key"></i> Change Password</h3>
+                                        <button class="password-modal-close" id="passwordModalClose">
+                                            <i class="ph ph-x"></i>
+                                        </button>
+                                    </div>
+                                    <form id="changePasswordForm" class="password-modal-form">
+                                        <div class="password-modal-field">
+                                            <label>Current Password</label>
+                                            <div class="password-modal-input-wrap">
+                                                <i class="ph ph-lock"></i>
+                                                <input type="password" id="currentPasswordInput"
+                                                    placeholder="Enter current password" required>
+                                            </div>
+                                        </div>
+                                        <div class="password-modal-field">
+                                            <label>New Password</label>
+                                            <div class="password-modal-input-wrap">
+                                                <i class="ph ph-lock-key"></i>
+                                                <input type="password" id="newPasswordInput"
+                                                    placeholder="Enter new password" required minlength="4">
+                                            </div>
+                                        </div>
+                                        <div class="password-modal-field">
+                                            <label>Confirm New Password</label>
+                                            <div class="password-modal-input-wrap">
+                                                <i class="ph ph-lock-key"></i>
+                                                <input type="password" id="confirmNewPasswordInput"
+                                                    placeholder="Confirm new password" required minlength="4">
+                                            </div>
+                                        </div>
+                                        <div class="password-modal-error" id="passwordModalError" style="display:none;">
+                                        </div>
+                                        <div class="password-modal-actions">
+                                            <button type="submit" class="btn-primary" id="passwordSaveBtn">Update
+                                                Password</button>
+                                            <button type="button" class="btn-outline"
+                                                id="passwordCancelBtn">Cancel</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="profile-actions">
+                                <button class="btn-primary profile-save-btn" id="profileSaveBtn">
+                                    Save Changes
+                                </button>
+                                <button class="btn-outline" id="profileCancelBtn">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================= -->
+                <!-- TODO CONTENT (inside dashboard-main)          -->
+                <!-- ============================================= -->
+                <div class="dashboard-content todo-content" id="todoContent" style="display:none;">
+                    <div class="todo-layout">
+                        <!-- Left: Task List -->
+                        <div class="todo-list-panel">
+                            <div class="todo-header">
+                                <div>
+                                    <h2 class="todo-title">Today's Task</h2>
+                                    <p class="todo-date" id="todoDate">Sunday, 6 April</p>
+                                </div>
+                            </div>
+
+                            <!-- Filter Tabs -->
+                            <div class="todo-filters">
+                                <button class="todo-filter-btn active" data-filter="all" id="filterAll">
+                                    All <span class="todo-count" id="countAll">6</span>
+                                </button>
+                                <button class="todo-filter-btn" data-filter="open" id="filterOpen">
+                                    Open <span class="todo-count" id="countOpen">3</span>
+                                </button>
+                                <button class="todo-filter-btn" data-filter="closed" id="filterClosed">
+                                    Closed <span class="todo-count" id="countClosed">2</span>
+                                </button>
+                                <button class="todo-filter-btn" data-filter="archived" id="filterArchived">
+                                    Archived <span class="todo-count" id="countArchived">1</span>
+                                </button>
+                            </div>
+
+                            <h3 class="todo-section-label">Task List</h3>
+
+                            <!-- Task Cards Container -->
+                            <div class="todo-cards" id="todoCards">
+                                <!-- Grid of smaller task cards -->
+                                <div class="todo-cards-grid">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: New Task Panel -->
+                        <div class="todo-new-panel">
+                            <h2 class="todo-new-title">+ New Task</h2>
+                            <form class="todo-new-form" id="newTaskForm">
+                                <div class="todo-form-field">
+                                    <label class="todo-form-label">Task Title</label>
+                                    <input type="text" class="todo-form-input" id="taskTitle"
+                                        placeholder="Name your task">
+                                </div>
+                                <div class="todo-form-field">
+                                    <label class="todo-form-label">Description</label>
+                                    <textarea class="todo-form-textarea" id="taskDesc" placeholder="Add details..."
+                                        rows="3"></textarea>
+                                </div>
+                                <div class="todo-form-field">
+                                    <label class="todo-form-label">Date & Time</label>
+                                    <input type="text" class="todo-form-input" id="taskDate" placeholder="Set deadline">
+                                </div>
+                                <div class="todo-form-field">
+                                    <label class="todo-form-label">Assignee</label>
+                                    <input type="text" class="todo-form-input" id="taskAssignee"
+                                        placeholder="Choose members">
+                                </div>
+                                <div class="todo-form-actions">
+                                    <button type="submit" class="btn-primary todo-create-btn" id="createTaskBtn">Create
+                                        Task</button>
+                                    <button type="button" class="btn-outline todo-cancel-btn"
+                                        id="cancelTaskBtn">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================= -->
+                <!-- FOCUS MODE CONTENT (inside dashboard-main)    -->
+                <!-- ============================================= -->
+                <div class="dashboard-content focus-content" id="focusContent" style="display:none;">
+                    <div class="focus-layout">
+                        <!-- Center: Timer Area -->
+                        <div class="focus-timer-area">
+                            <!-- Session Type Tabs -->
+                            <div class="focus-session-tabs">
+                                <button class="focus-tab active" data-session="pomodoro" id="tabPomodoro">
+                                    <i class="ph ph-brain"></i> Focus
+                                </button>
+                                <button class="focus-tab" data-session="short" id="tabShortBreak">
+                                    <i class="ph ph-coffee"></i> Short Break
+                                </button>
+                                <button class="focus-tab" data-session="long" id="tabLongBreak">
+                                    <i class="ph ph-moon-stars"></i> Long Break
+                                </button>
+                            </div>
+
+                            <!-- Timer Ring -->
+                            <div class="focus-timer-wrapper">
+                                <svg class="focus-ring" viewBox="0 0 260 260">
+                                    <defs>
+                                        <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#6B4CE6" />
+                                            <stop offset="50%" stop-color="#9B7BF7" />
+                                            <stop offset="100%" stop-color="#B99CFF" />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="focus-ring-bg" cx="130" cy="130" r="115" />
+                                    <circle class="focus-ring-progress" id="focusRingProgress" cx="130" cy="130"
+                                        r="115" />
+                                    <circle class="focus-ring-glow" id="focusRingGlow" cx="130" cy="130" r="115" />
+                                </svg>
+                                <div class="focus-timer-display">
+                                    <div class="focus-time" id="focusTimeDisplay">25:00</div>
+                                    <div class="focus-session-label" id="focusSessionLabel">Focus Session</div>
+                                </div>
+                            </div>
+
+                            <!-- Timer Controls -->
+                            <div class="focus-controls">
+                                <button class="focus-ctrl-btn focus-ctrl-secondary" id="focusResetBtn" title="Reset">
+                                    <i class="ph ph-arrow-counter-clockwise"></i>
+                                </button>
+                                <button class="focus-ctrl-btn focus-ctrl-primary" id="focusStartBtn">
+                                    <i class="ph ph-play" id="focusPlayIcon"></i>
+                                    <span id="focusStartLabel">Start Focus</span>
+                                </button>
+                                <button class="focus-ctrl-btn focus-ctrl-secondary" id="focusSkipBtn" title="Skip">
+                                    <i class="ph ph-skip-forward"></i>
+                                </button>
+                            </div>
+
+                            <!-- Session Counter -->
+                            <div class="focus-session-counter">
+                                <div class="focus-dots" id="focusDots">
+                                    <span class="focus-dot active"></span>
+                                    <span class="focus-dot"></span>
+                                    <span class="focus-dot"></span>
+                                    <span class="focus-dot"></span>
+                                </div>
+                                <span class="focus-counter-text" id="focusCounterText">Session 1 of 4</span>
+                            </div>
+
+                            <!-- Current Task -->
+                            <div class="focus-current-task" id="focusCurrentTask">
+                                <i class="ph ph-target"></i>
+                                <input type="text" class="focus-task-input" id="focusTaskInput"
+                                    placeholder="What are you working on?">
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Stats & Settings -->
+                        <div class="focus-side-panel">
+                            <!-- Today's Stats -->
+                            <div class="focus-stats-card">
+                                <h3 class="focus-panel-title">Today's Progress</h3>
+                                <div class="focus-stats-grid">
+                                    <div class="focus-stat">
+                                        <div class="focus-stat-icon"
+                                            style="background: var(--primary-light); color: var(--primary);">
+                                            <i class="ph ph-timer"></i>
+                                        </div>
+                                        <div class="focus-stat-info">
+                                            <span class="focus-stat-value" id="focusTotalTime">0h 0m</span>
+                                            <span class="focus-stat-label">Total Focus</span>
+                                        </div>
+                                    </div>
+                                    <div class="focus-stat">
+                                        <div class="focus-stat-icon"
+                                            style="background: var(--success-bg); color: var(--success);">
+                                            <i class="ph ph-check-circle"></i>
+                                        </div>
+                                        <div class="focus-stat-info">
+                                            <span class="focus-stat-value" id="focusSessionsDone">0</span>
+                                            <span class="focus-stat-label">Sessions Done</span>
+                                        </div>
+                                    </div>
+                                    <div class="focus-stat">
+                                        <div class="focus-stat-icon"
+                                            style="background: var(--warning-bg); color: var(--warning);">
+                                            <i class="ph ph-fire"></i>
+                                        </div>
+                                        <div class="focus-stat-info">
+                                            <span class="focus-stat-value" id="focusStreak">0</span>
+                                            <span class="focus-stat-label">Day Streak</span>
+                                        </div>
+                                    </div>
+                                    <div class="focus-stat">
+                                        <div class="focus-stat-icon"
+                                            style="background: rgba(99, 102, 241, 0.1); color: #6366F1;">
+                                            <i class="ph ph-trophy"></i>
+                                        </div>
+                                        <div class="focus-stat-info">
+                                            <span class="focus-stat-value" id="focusBestDay">0h 0m</span>
+                                            <span class="focus-stat-label">Best Day</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Timer Settings -->
+                            <div class="focus-settings-card">
+                                <h3 class="focus-panel-title">Timer Settings</h3>
+                                <div class="focus-setting-row">
+                                    <label class="focus-setting-label">Focus Duration</label>
+                                    <div class="focus-setting-control">
+                                        <button class="focus-inc-btn" data-target="focusDuration"
+                                            data-action="dec">−</button>
+                                        <span class="focus-setting-value" id="focusDurationVal">25</span>
+                                        <span class="focus-setting-unit">min</span>
+                                        <button class="focus-inc-btn" data-target="focusDuration"
+                                            data-action="inc">+</button>
+                                    </div>
+                                </div>
+                                <div class="focus-setting-row">
+                                    <label class="focus-setting-label">Short Break</label>
+                                    <div class="focus-setting-control">
+                                        <button class="focus-inc-btn" data-target="shortBreak"
+                                            data-action="dec">−</button>
+                                        <span class="focus-setting-value" id="shortBreakVal">5</span>
+                                        <span class="focus-setting-unit">min</span>
+                                        <button class="focus-inc-btn" data-target="shortBreak"
+                                            data-action="inc">+</button>
+                                    </div>
+                                </div>
+                                <div class="focus-setting-row">
+                                    <label class="focus-setting-label">Long Break</label>
+                                    <div class="focus-setting-control">
+                                        <button class="focus-inc-btn" data-target="longBreak"
+                                            data-action="dec">−</button>
+                                        <span class="focus-setting-value" id="longBreakVal">15</span>
+                                        <span class="focus-setting-unit">min</span>
+                                        <button class="focus-inc-btn" data-target="longBreak"
+                                            data-action="inc">+</button>
+                                    </div>
+                                </div>
+                                <div class="focus-setting-row">
+                                    <label class="focus-setting-label">Auto-start Breaks</label>
+                                    <label class="focus-toggle">
+                                        <input type="checkbox" id="autoStartBreaks">
+                                        <span class="focus-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="focus-setting-row">
+                                    <label class="focus-setting-label">Sound Alert</label>
+                                    <label class="focus-toggle">
+                                        <input type="checkbox" id="soundAlert" checked>
+                                        <span class="focus-toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Session History -->
+                            <div class="focus-history-card">
+                                <h3 class="focus-panel-title">Recent Sessions</h3>
+                                <div class="focus-history-list" id="focusHistoryList">
+                                    <div class="focus-history-empty">
+                                        <i class="ph ph-clock-countdown"></i>
+                                        <p>No sessions yet today</p>
+                                        <span>Start your first focus session!</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================= -->
+                <!-- HABIT TRACKER CONTENT (inside dashboard-main) -->
+                <!-- ============================================= -->
+                <div class="dashboard-content habits-content" id="habitsContent" style="display:none;">
+                    <div class="habits-tracker-layout">
+                        <!-- Left: Habits List -->
+                        <div class="habits-main-panel">
+                            <!-- Header -->
+                            <div class="habits-header">
+                                <div>
+                                    <h2 class="habits-page-title">Habit Tracker</h2>
+                                    <p class="habits-subtitle" id="habitsDateLabel">Track your daily habits</p>
+                                </div>
+                                <button class="btn-primary habits-add-btn" id="habitsAddBtn">
+                                    <i class="ph ph-plus"></i> New Habit
+                                </button>
+                            </div>
+
+                            <!-- Weekly Overview -->
+                            <div class="habits-week-overview">
+                                <div class="habits-week-header">
+                                    <h3 class="habits-section-title"><i class="ph ph-calendar-dots"></i> This Week</h3>
+                                    <div class="habits-week-nav">
+                                        <button class="habits-week-nav-btn" id="habitWeekPrev"><i
+                                                class="ph ph-caret-left"></i></button>
+                                        <span class="habits-week-range" id="habitWeekRange">Apr 7 – Apr 13</span>
+                                        <button class="habits-week-nav-btn" id="habitWeekNext"><i
+                                                class="ph ph-caret-right"></i></button>
+                                    </div>
+                                </div>
+                                <div class="habits-week-grid">
+                                    <div class="habits-week-day-labels">
+                                        <div class="habits-week-label-spacer"></div>
+                                        <div class="habits-week-day-label" data-day="0">Mon</div>
+                                        <div class="habits-week-day-label" data-day="1">Tue</div>
+                                        <div class="habits-week-day-label" data-day="2">Wed</div>
+                                        <div class="habits-week-day-label" data-day="3">Thu</div>
+                                        <div class="habits-week-day-label" data-day="4">Fri</div>
+                                        <div class="habits-week-day-label" data-day="5">Sat</div>
+                                        <div class="habits-week-day-label" data-day="6">Sun</div>
+                                    </div>
+                                    <div class="habits-week-rows" id="habitsWeekRows">
+                                        <!-- Filled by JS -->
+                                        <div class="habits-week-empty">
+                                            <i class="ph ph-calendar-plus"></i>
+                                            <p>Add habits to see your weekly progress</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Habits Cards List -->
+                            <div class="habits-cards-section">
+                                <div class="habits-cards-header">
+                                    <h3 class="habits-section-title"><i class="ph ph-list-checks"></i> Today's Habits
+                                    </h3>
+                                    <div class="habits-filter-group">
+                                        <button class="habits-filter active" data-filter="all"
+                                            id="habitFilterAll">All</button>
+                                        <button class="habits-filter" data-filter="pending"
+                                            id="habitFilterPending">Pending</button>
+                                        <button class="habits-filter" data-filter="done"
+                                            id="habitFilterDone">Done</button>
+                                    </div>
+                                </div>
+                                <div class="habits-cards-list" id="habitsCardsList">
+                                    <!-- Habit cards rendered by JS -->
+                                    <div class="habits-cards-empty" id="habitsCardsEmpty">
+                                        <div class="habits-empty-icon">
+                                            <i class="ph ph-plant"></i>
+                                        </div>
+                                        <h3>No habits yet</h3>
+                                        <p>Start building positive routines by adding your first habit</p>
+                                        <button class="btn-primary habits-empty-add-btn" id="habitsEmptyAddBtn">
+                                            <i class="ph ph-plus"></i> Add Your First Habit
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Stats & Add Habit -->
+                        <div class="habits-side-panel">
+                            <!-- Add Habit Form (hidden initially) -->
+                            <div class="habits-form-card" id="habitsFormCard" style="display:none;">
+                                <h3 class="habits-panel-title"><i class="ph ph-plus-circle"></i> New Habit</h3>
+                                <form id="habitForm" class="habits-form">
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Habit Name</label>
+                                        <input type="text" class="habits-form-input" id="habitName"
+                                            placeholder="e.g. Morning Meditation" required>
+                                    </div>
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Category</label>
+                                        <div class="habits-category-picker" id="habitCategoryPicker">
+                                            <button type="button" class="habits-cat-btn active" data-category="health"
+                                                title="Health">
+                                                <i class="ph ph-heart"></i>
+                                            </button>
+                                            <button type="button" class="habits-cat-btn" data-category="fitness"
+                                                title="Fitness">
+                                                <i class="ph ph-barbell"></i>
+                                            </button>
+                                            <button type="button" class="habits-cat-btn" data-category="mindfulness"
+                                                title="Mindfulness">
+                                                <i class="ph ph-flower-lotus"></i>
+                                            </button>
+                                            <button type="button" class="habits-cat-btn" data-category="learning"
+                                                title="Learning">
+                                                <i class="ph ph-book-open"></i>
+                                            </button>
+                                            <button type="button" class="habits-cat-btn" data-category="productivity"
+                                                title="Productivity">
+                                                <i class="ph ph-lightning"></i>
+                                            </button>
+                                            <button type="button" class="habits-cat-btn" data-category="social"
+                                                title="Social">
+                                                <i class="ph ph-users"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Frequency</label>
+                                        <select class="habits-form-select" id="habitFrequency">
+                                            <option value="daily">Daily</option>
+                                            <option value="weekdays">Weekdays</option>
+                                            <option value="weekends">Weekends</option>
+                                            <option value="custom">Custom</option>
+                                        </select>
+                                    </div>
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Goal / Target (optional)</label>
+                                        <input type="text" class="habits-form-input" id="habitGoal"
+                                            placeholder="e.g. 30 minutes, 8 glasses">
+                                    </div>
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Reminder Time</label>
+                                        <input type="time" class="habits-form-input" id="habitReminder" value="08:00">
+                                    </div>
+                                    <div class="habits-form-field">
+                                        <label class="habits-form-label">Color</label>
+                                        <div class="habits-color-picker" id="habitColorPicker">
+                                            <button type="button" class="habits-color-btn active" data-color="#6B4CE6"
+                                                style="background:#6B4CE6"></button>
+                                            <button type="button" class="habits-color-btn" data-color="#E53935"
+                                                style="background:#E53935"></button>
+                                            <button type="button" class="habits-color-btn" data-color="#F5A623"
+                                                style="background:#F5A623"></button>
+                                            <button type="button" class="habits-color-btn" data-color="#28A745"
+                                                style="background:#28A745"></button>
+                                            <button type="button" class="habits-color-btn" data-color="#2196F3"
+                                                style="background:#2196F3"></button>
+                                            <button type="button" class="habits-color-btn" data-color="#E91E8F"
+                                                style="background:#E91E8F"></button>
+                                        </div>
+                                    </div>
+                                    <div class="habits-form-actions">
+                                        <button type="submit" class="btn-primary habits-form-submit">Create
+                                            Habit</button>
+                                        <button type="button" class="btn-outline habits-form-cancel"
+                                            id="habitFormCancel">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Overall Stats -->
+                            <div class="habits-stats-card">
+                                <h3 class="habits-panel-title"><i class="ph ph-chart-line-up"></i> Overview</h3>
+                                <div class="habits-stats-grid">
+                                    <div class="habits-stat-item">
+                                        <div class="habits-stat-icon"
+                                            style="background: var(--primary-light); color: var(--primary);">
+                                            <i class="ph ph-check-circle"></i>
+                                        </div>
+                                        <div class="habits-stat-info">
+                                            <span class="habits-stat-value" id="habitStatCompleted">0</span>
+                                            <span class="habits-stat-label">Completed Today</span>
+                                        </div>
+                                    </div>
+                                    <div class="habits-stat-item">
+                                        <div class="habits-stat-icon"
+                                            style="background: var(--warning-bg); color: var(--warning);">
+                                            <i class="ph ph-fire"></i>
+                                        </div>
+                                        <div class="habits-stat-info">
+                                            <span class="habits-stat-value" id="habitStatStreak">0</span>
+                                            <span class="habits-stat-label">Best Streak</span>
+                                        </div>
+                                    </div>
+                                    <div class="habits-stat-item">
+                                        <div class="habits-stat-icon"
+                                            style="background: var(--success-bg); color: var(--success);">
+                                            <i class="ph ph-trophy"></i>
+                                        </div>
+                                        <div class="habits-stat-info">
+                                            <span class="habits-stat-value" id="habitStatRate">0%</span>
+                                            <span class="habits-stat-label">Completion Rate</span>
+                                        </div>
+                                    </div>
+                                    <div class="habits-stat-item">
+                                        <div class="habits-stat-icon"
+                                            style="background: rgba(99, 102, 241, 0.1); color: #6366F1;">
+                                            <i class="ph ph-calendar-check"></i>
+                                        </div>
+                                        <div class="habits-stat-info">
+                                            <span class="habits-stat-value" id="habitStatTotal">0</span>
+                                            <span class="habits-stat-label">Total Habits</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Completion Ring -->
+                            <div class="habits-ring-card">
+                                <h3 class="habits-panel-title"><i class="ph ph-chart-donut"></i> Today's Progress</h3>
+                                <div class="habits-ring-wrapper-large">
+                                    <svg class="habits-ring-svg" viewBox="0 0 160 160">
+                                        <circle cx="80" cy="80" r="68" stroke="var(--border-color)" stroke-width="8"
+                                            fill="none" />
+                                        <circle cx="80" cy="80" r="68" stroke="url(#habitRingGrad)" stroke-width="8"
+                                            fill="none" stroke-dasharray="427.26" stroke-dashoffset="427.26"
+                                            stroke-linecap="round" transform="rotate(-90 80 80)"
+                                            class="habits-ring-track" id="habitRingTrack" />
+                                        <defs>
+                                            <linearGradient id="habitRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stop-color="#6B4CE6" />
+                                                <stop offset="100%" stop-color="#28A745" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div class="habits-ring-center">
+                                        <span class="habits-ring-pct" id="habitRingPct">0%</span>
+                                        <span class="habits-ring-sublabel">Complete</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Streak Leaderboard -->
+                            <div class="habits-streaks-card">
+                                <h3 class="habits-panel-title"><i class="ph ph-ranking"></i> Top Streaks</h3>
+                                <div class="habits-streaks-list" id="habitsStreaksList">
+                                    <div class="habits-streaks-empty">
+                                        <i class="ph ph-medal"></i>
+                                        <p>Complete habits to build streaks!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ============================================= -->
+                <!-- CONTACT CONTENT (inside dashboard-main)       -->
+                <!-- ============================================= -->
+                <div class="dashboard-content contact-content" id="contactContent" style="display:none;">
+                    <div class="contact-layout">
+                        <div class="contact-grid">
+                            <!-- Left Column -->
+                            <div class="contact-left">
+                                <h2 class="contact-title">Contact Us</h2>
+                                <div class="contact-hero-text">
+                                    <h1>We're here to <br>build habits.</h1>
+                                    <p>
+                                        CTRL App is a time management tool designed to help you organize your time,
+                                        build new healthy habits, and maintain focus. Feel free to contact us.
+                                    </p>
+                                </div>
+                                <div class="contact-info-list">
+                                    <div class="contact-info-item">
+                                        <div class="contact-icon-box">
+                                            <i class="ph ph-envelope"></i>
+                                        </div>
+                                        <div class="contact-info-content">
+                                            <label>E-mail</label>
+                                            <span>abdu7hakim@gmail.com</span>
+                                        </div>
+                                    </div>
+                                    <div class="contact-info-item">
+                                        <div class="contact-icon-box">
+                                            <i class="ph ph-phone"></i>
+                                        </div>
+                                        <div class="contact-info-content">
+                                            <label>Phone number</label>
+                                            <span>+998 90 776 33 79</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Right Column -->
+                            <div class="contact-right">
+                                <div class="contact-form-card">
+                                    <form id="contactForm" class="contact-form">
+                                        <div class="form-group">
+                                            <label>Name</label>
+                                            <input type="text" id="contactName" placeholder="Jane Smith" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Email</label>
+                                            <input type="email" id="contactEmail" placeholder="jenel@email.com"
+                                                required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Message</label>
+                                            <textarea id="contactMessage" placeholder="Type your message" rows="6"
+                                                required></textarea>
+                                        </div>
+                                        <button type="submit" class="btn-primary" id="contactSubmitBtn">
+                                            <span>Get a Solution</span>
+                                            <i class="ph ph-paper-plane-tilt"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Focus Mode Toggle (from mockup) -->
+                        <!-- <div class="focus-mode-toggle" id="focusModeToggleBtn">
+                            <i class="ph ph-corners-out"></i>
+                            <span>Focus Mode</span>
+                        </div> -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Script at the end -->
+    <script src="script.js"></script>
+</body>
+
+</html>
