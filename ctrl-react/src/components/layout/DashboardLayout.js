@@ -16,11 +16,40 @@ const pageTitles = {
   focus: 'Diqqat vaqti',
   profile: 'Profil',
   contact: 'Aloqa',
+  settings: 'Sozlamalar',
+};
+
+const pageDescriptions = {
+  todo: {
+    subtitle: 'KUNLIK REJANGIZ',
+    description: 'Rejalaringizni yozib boring va har bir qadamni belgilang.',
+  },
+  habits: {
+    subtitle: 'IZCHILLIK — KALIT',
+    description: 'Har kuni takrorlang. Kichik odatlar katta o‘zgarishlar yaratadi.',
+  },
+  focus: {
+    subtitle: 'CHALG‘ITUVCHILARSIZ VAQT',
+    description: 'Fokus va tanaffus davomiyligini o‘zingiz belgilang.',
+  },
+  profile: {
+    subtitle: 'SHAXSIY MA’LUMOTLAR',
+    description: 'Hisobingizdagi ism va ma’lumotlarni yangilang.',
+  },
+  contact: {
+    subtitle: 'BIZ BILAN BOG‘LANING',
+    description: 'Savol yoki takliflaringiz bormi? Bizga yozing.',
+  },
+  settings: {
+    subtitle: 'ILOVA SOZLAMALARI',
+    description: 'CTRL ilovasining ko‘rinishini o‘zingizga moslang.',
+  },
 };
 
 function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onToggleTheme, onLogout, children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase();
+  const pageDescription = pageDescriptions[page];
 
   const navigate = (id) => {
     onNavigate(id);
@@ -44,11 +73,10 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-tip">
-            <span className="tip-icon"><i className="ph ph-sparkle" /></span>
-            <strong>Kichik qadamlar</strong>
-            <p>Har kuni ozgina harakat — katta natijalarga olib keladi.</p>
-          </div>
+          <button className={`nav-link ${page === 'settings' ? 'nav-link-active' : ''}`} onClick={() => navigate('settings')}>
+            <i className="ph ph-gear-six" aria-hidden="true" /><span>Sozlamalar</span>
+            {page === 'settings' && <i className="ph ph-caret-right nav-current" aria-hidden="true" />}
+          </button>
           <button className="nav-link logout-link" onClick={onLogout}><i className="ph ph-sign-out" /><span>Chiqish</span></button>
           <span className="sidebar-version">CTRL · Shaxsiy unumdorlik</span>
         </div>
@@ -56,11 +84,18 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
       <main className="main-area">
         <header className="topbar">
           <button className="icon-button mobile-menu-button" aria-label="Menyuni ochish" onClick={() => setMenuOpen(true)}><i className="ph ph-list" /></button>
-          <div className="topbar-title"><span className="topbar-date">{new Intl.DateTimeFormat('uz-UZ', { dateStyle: 'full' }).format(new Date())}</span><h1>{pageTitles[page] || pageTitles.dashboard}</h1></div>
+          <div className="topbar-title">
+            <div className="topbar-heading-row">
+              <h1>{pageTitles[page] || pageTitles.dashboard}</h1>
+              {pageDescription && <div className="topbar-page-meta"><span className="eyebrow">{pageDescription.subtitle}</span><p>{pageDescription.description}</p></div>}
+            </div>
+          </div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label={darkMode ? 'Yorug‘ rejim' : 'Tungi rejim'} onClick={onToggleTheme} disabled={themeSaving}><i className={`ph ${darkMode ? 'ph-sun' : 'ph-moon'}`} /></button>
             <button className="profile-chip" onClick={() => navigate('profile')} aria-label="Profilni ochish">
-              <span className="avatar">{initials || 'U'}</span>
+              {user.photoURL
+                ? <img className="avatar profile-chip-avatar" src={user.photoURL} alt="" />
+                : <span className="avatar">{initials || 'U'}</span>}
               <span className="profile-chip-name">{user.firstName}</span>
               <i className="ph ph-caret-down" />
             </button>

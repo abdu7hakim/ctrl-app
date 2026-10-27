@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
+import { defaultThemeId } from '../../utils/themes';
 
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('signup');
@@ -42,6 +43,12 @@ function AuthScreen({ onAuthenticated }) {
           focusSessions: 0,
           focusMinutes: 0,
           darkMode: false,
+          colorTheme: defaultThemeId,
+          focusDurationMinutes: 25,
+          breakDurationMinutes: 5,
+          focusAlarmSound: 'bell',
+          focusBackgroundMusic: false,
+          focusBackgroundTrack: 'ambient',
         }, { merge: true });
 
         onAuthenticated?.({

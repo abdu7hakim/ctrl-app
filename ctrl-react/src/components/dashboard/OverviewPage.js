@@ -1,18 +1,47 @@
+import { useEffect, useState } from 'react';
+import { getDailyMotivation } from '../../utils/motivation';
+
 function OverviewPage({ user, data, stats, onNavigate }) {
-  const today = new Date().toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long' });
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const today = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(currentDate);
   const progress = data.habits.length ? Math.round((stats.completedHabits / data.habits.length) * 100) : 0;
   const nextTodos = data.todos.filter((todo) => todo.status === 'open').slice(0, 4);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = new Date();
+      setCurrentDate((previousDate) => (
+        now.toDateString() === previousDate.toDateString() ? previousDate : now
+      ));
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const motivation = getDailyMotivation(currentDate);
 
   return (
     <div className="page-content">
       <section className="welcome-banner">
-        <div>
-          <span className="eyebrow">BUGUN · {today.toUpperCase()}</span>
-          <h2>Salom, {user.firstName}! <span className="wave">✦</span></h2>
+        <div className="welcome-copy">
+          <span className="welcome-date"><span aria-hidden="true" />BUGUN · {today}</span>
+          <h2>Salom, {user.firstName}! <i className="ph ph-hand-waving wave" aria-hidden="true" /></h2>
           <p>Bugun maqsadlaringizga yaqinlashish uchun ajoyib kun.</p>
-          <button className="button button-light" onClick={() => onNavigate('todo')}>Vazifalarni ko‘rish <i className="ph ph-arrow-up-right" /></button>
+          <button className="button welcome-button" onClick={() => onNavigate('todo')}>Vazifalarni ko‘rish <i className="ph ph-arrow-up-right" /></button>
         </div>
-        <div className="banner-decoration" aria-hidden="true"><span>CTRL</span><i className="ph ph-sparkle" /></div>
+        <div className="welcome-art" aria-hidden="true">
+          <div className="welcome-orbit" />
+          <div className="welcome-logo-tile"><span className="brand-mark">C</span><i className="ph ph-sparkle" /></div>
+          <div className="welcome-preview">
+            <div className="welcome-preview-top"><strong>CTRL</strong><span><i className="ph ph-sun" /><span className="avatar">A</span></span></div>
+            <h3>Focus. Achieve. Grow.</h3>
+            <p>Maqsadlaringizga yana bir qadam.</p>
+            <div className="welcome-streak"><i className="ph ph-fire" /><strong>12</strong><span>kunlik izchillik</span><i className="ph ph-trend-up" /></div>
+            <div className="welcome-preview-tasks"><strong>Bugungi vazifalar</strong><span><i className="ph ph-circle" /> Muhim ishni rejalashtiring <i className="ph ph-arrow-right" /></span></div>
+          </div>
+          <div className="welcome-chart"><i className="ph ph-chart-bar" /></div>
+          <i className="ph ph-sparkle welcome-star" />
+        </div>
       </section>
       <section className="stat-grid" aria-label="Bugungi statistika">
         <article className="stat-card"><div className="stat-card-top"><span className="stat-icon violet"><i className="ph ph-check-circle" /></span><span className="stat-caption">Vazifalar</span></div><strong>{stats.done}<small> / {data.todos.length}</small></strong><p>Bajarilgan vazifalar</p></article>
@@ -20,6 +49,10 @@ function OverviewPage({ user, data, stats, onNavigate }) {
         <article className="stat-card"><div className="stat-card-top"><span className="stat-icon orange"><i className="ph ph-timer" /></span><span className="stat-caption">Diqqat vaqti</span></div><strong>{stats.focusMinutes}<small> daq</small></strong><p>{data.focusSessions} ta fokus sessiyasi</p></article>
         <article className="stat-card"><div className="stat-card-top"><span className="stat-icon blue"><i className="ph ph-list-checks" /></span><span className="stat-caption">Kutilmoqda</span></div><strong>{stats.pending}</strong><p>Ochiq vazifalar</p></article>
       </section>
+      <aside className="daily-motivation">
+        <span className="tip-icon"><i className="ph ph-sparkle" aria-hidden="true" /></span>
+        <div><span className="eyebrow">BUGUNGI ILHOM</span><p>{motivation}</p></div>
+      </aside>
       <div className="overview-grid">
         <section className="surface-card overview-tasks">
           <div className="section-heading"><div><span className="eyebrow">REJA</span><h3>Bugungi vazifalar</h3></div><button className="text-button" onClick={() => onNavigate('todo')}>Barchasi <i className="ph ph-arrow-right" /></button></div>

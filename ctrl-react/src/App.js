@@ -7,12 +7,27 @@ import HabitsPage from './components/habits/HabitsPage';
 import FocusPage from './components/focus/FocusPage';
 import ProfilePage from './components/profile/ProfilePage';
 import ContactPage from './components/contact/ContactPage';
+import SettingsPage from './components/settings/SettingsPage';
+import { defaultThemeId, getColorTheme } from './utils/themes';
+import { isTodoOverdue } from './utils/todoDeadlines';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
 import './App.css';
 
-const initialData = { todos: [], habits: [], focusSessions: 0, focusMinutes: 0, darkMode: false };
+const initialData = {
+  todos: [],
+  habits: [],
+  focusSessions: 0,
+  focusMinutes: 0,
+  darkMode: false,
+  colorTheme: defaultThemeId,
+  focusDurationMinutes: 25,
+  breakDurationMinutes: 5,
+  focusAlarmSound: 'bell',
+  focusBackgroundMusic: false,
+  focusBackgroundTrack: 'ambient',
+};
 
 function getNameParts(displayName, email) {
   const [firstName = '', ...lastNameParts] = (displayName || '').trim().split(/\s+/);
@@ -27,6 +42,7 @@ function App() {
   const [page, setPage] = useState('dashboard');
   const [data, setData] = useState(initialData);
   const [darkMode, setDarkMode] = useState(false);
+  const [colorTheme, setColorTheme] = useState(defaultThemeId);
   const [notice, setNotice] = useState('');
   const [themeSaving, setThemeSaving] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -35,10 +51,20 @@ function App() {
   const [dataError, setDataError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const authGeneration = useRef(0);
+  const latestData = useRef(data);
+  const expiryErrorKey = useRef('');
+
+  useEffect(() => {
+    latestData.current = data;
+  }, [data]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
-  }, [darkMode]);
+    const palette = getColorTheme(colorTheme)[darkMode ? 'dark' : 'light'];
+    Object.entries(palette).forEach(([name, value]) => {
+      document.documentElement.style.setProperty(`--${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value);
+    });
+  }, [darkMode, colorTheme]);
 
   useEffect(() => {
     let active = true;
@@ -49,6 +75,7 @@ function App() {
         setUser(null);
         setData(initialData);
         setDarkMode(false);
+        setColorTheme(defaultThemeId);
         setDataLoading(false);
         setDataError('');
         setAuthLoading(false);
@@ -60,6 +87,7 @@ function App() {
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         ...getNameParts(firebaseUser.displayName, firebaseUser.email),
+        photoURL: firebaseUser.photoURL || '',
       };
       setUser(identity);
       setAuthError('');
@@ -84,6 +112,27 @@ function App() {
             todos: Array.isArray(storedData.todos) ? storedData.todos : [],
             habits: Array.isArray(storedData.habits) ? storedData.habits : [],
             darkMode: typeof storedData.darkMode === 'boolean' ? storedData.darkMode : false,
+            colorTheme: getColorTheme(storedData.colorTheme).id,
+            photoURL: typeof storedData.photoURL === 'string' ? storedData.photoURL : identity.photoURL,
+            focusDurationMinutes: Number.isSafeInteger(storedData.focusDurationMinutes)
+              && storedData.focusDurationMinutes > 0
+              && storedData.focusDurationMinutes <= Math.floor(Number.MAX_SAFE_INTEGER / 60)
+              ? storedData.focusDurationMinutes
+              : initialData.focusDurationMinutes,
+            breakDurationMinutes: Number.isSafeInteger(storedData.breakDurationMinutes)
+              && storedData.breakDurationMinutes > 0
+              && storedData.breakDurationMinutes <= Math.floor(Number.MAX_SAFE_INTEGER / 60)
+              ? storedData.breakDurationMinutes
+              : initialData.breakDurationMinutes,
+            focusAlarmSound: ['bell', 'chime', 'digital'].includes(storedData.focusAlarmSound)
+              ? storedData.focusAlarmSound
+              : initialData.focusAlarmSound,
+            focusBackgroundMusic: typeof storedData.focusBackgroundMusic === 'boolean'
+              ? storedData.focusBackgroundMusic
+              : initialData.focusBackgroundMusic,
+            focusBackgroundTrack: ['ambient', 'rain', 'soft'].includes(storedData.focusBackgroundTrack)
+              ? storedData.focusBackgroundTrack
+              : initialData.focusBackgroundTrack,
           };
           if (!snapshot.exists()) {
             await setDoc(userRef, { ...profileDefaults, ...initialData }, { merge: true });
@@ -92,6 +141,7 @@ function App() {
             Object.entries(profileDefaults).forEach(([key, value]) => {
               if (typeof storedData[key] !== 'string') missingProfile[key] = value;
             });
+            if (storedData.email !== identity.email) missingProfile.email = identity.email;
             if (Object.keys(missingProfile).length) {
               await setDoc(userRef, missingProfile, { merge: true });
             }
@@ -101,10 +151,12 @@ function App() {
               ...identity,
               firstName: storedData.firstName || identity.firstName,
               lastName: storedData.lastName || identity.lastName,
+              photoURL: nextData.photoURL,
             });
           }
           if (active && generation === authGeneration.current) setData(nextData);
           if (active && generation === authGeneration.current) setDarkMode(nextData.darkMode);
+          if (active && generation === authGeneration.current) setColorTheme(nextData.colorTheme);
         } catch (error) {
           console.error('Foydalanuvchi ma’lumotlarini yuklashda xatolik:', error);
           if (active && generation === authGeneration.current) {
@@ -135,6 +187,53 @@ function App() {
     const timer = window.setTimeout(() => setNotice(''), 3000);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!user || dataLoading) return undefined;
+    let active = true;
+    let removingExpiredTodos = false;
+
+    const removeExpiredTodos = async () => {
+      if (removingExpiredTodos) return;
+      const currentTodos = latestData.current.todos;
+      const expiredTodos = currentTodos.filter((todo) => isTodoOverdue(todo));
+      if (!expiredTodos.length) {
+        expiryErrorKey.current = '';
+        return;
+      }
+
+      removingExpiredTodos = true;
+      const expiredIds = new Set(expiredTodos.map((todo) => todo.id));
+      const errorKey = expiredTodos.map((todo) => todo.id).sort().join(',');
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          todos: currentTodos.filter((todo) => !expiredIds.has(todo.id)),
+        });
+        expiryErrorKey.current = '';
+        if (active) {
+          setData((current) => ({
+            ...current,
+            todos: current.todos.filter((todo) => !expiredIds.has(todo.id)),
+          }));
+        }
+      } catch (error) {
+        console.error('Muddati tugagan vazifalarni o‘chirishda xatolik:', error);
+        if (active && expiryErrorKey.current !== errorKey) {
+          expiryErrorKey.current = errorKey;
+          setNotice('Muddati tugagan vazifalarni o‘chirib bo‘lmadi. Internet aloqasini tekshiring.');
+        }
+      } finally {
+        removingExpiredTodos = false;
+      }
+    };
+
+    removeExpiredTodos();
+    const intervalId = window.setInterval(removeExpiredTodos, 15 * 1000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [dataLoading, user]);
 
   const stats = useMemo(() => ({
     done: data.todos.filter((todo) => todo.status === 'done').length,
@@ -169,6 +268,14 @@ function App() {
     }));
   };
 
+  const saveFocusPreferences = async (preferences) => {
+    if (!user || auth.currentUser?.uid !== user.uid) {
+      throw new Error('Pomodoro sozlamalarini saqlash uchun hisobingizga kiring.');
+    }
+    await updateDoc(doc(db, 'users', user.uid), preferences);
+    setData((current) => ({ ...current, ...preferences }));
+  };
+
   const toggleTheme = async () => {
     if (!user || auth.currentUser?.uid !== user.uid) {
       setNotice('Mavzuni saqlash uchun hisobingizga kiring.');
@@ -184,6 +291,26 @@ function App() {
     } catch (error) {
       console.error('Mavzu sozlamasini saqlashda xatolik:', error);
       setNotice('Mavzu sozlamasini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
+  const saveColorTheme = async (themeId) => {
+    const selectedTheme = getColorTheme(themeId);
+    if (!user || auth.currentUser?.uid !== user.uid) {
+      setNotice('Rang mavzusini saqlash uchun hisobingizga kiring.');
+      return;
+    }
+
+    setThemeSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { colorTheme: selectedTheme.id });
+      setColorTheme(selectedTheme.id);
+      setData((current) => ({ ...current, colorTheme: selectedTheme.id }));
+    } catch (error) {
+      console.error('Rang mavzusini saqlashda xatolik:', error);
+      setNotice('Rang mavzusini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setThemeSaving(false);
     }
@@ -233,12 +360,18 @@ function App() {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} />,
     todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} />,
-    focus: <FocusPage onSessionComplete={saveFocusSession} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
       setNotice('Profil ma’lumotlari saqlandi.');
     }} />,
     contact: <ContactPage user={user} onSend={() => setNotice('Xabaringiz qabul qilindi. Rahmat!')} />,
+    settings: <SettingsPage
+      darkMode={darkMode}
+      themeSaving={themeSaving}
+      colorTheme={colorTheme}
+      onToggleTheme={toggleTheme}
+      onSelectColorTheme={saveColorTheme}
+    />,
   };
 
   return (
@@ -252,7 +385,18 @@ function App() {
         onToggleTheme={toggleTheme}
         onLogout={logout}
       >
-        {pages[page] || pages.dashboard}
+        {page !== 'focus' && (pages[page] || pages.dashboard)}
+        <div hidden={page !== 'focus'}>
+          <FocusPage
+            onSessionComplete={saveFocusSession}
+            focusDurationMinutes={data.focusDurationMinutes}
+            breakDurationMinutes={data.breakDurationMinutes}
+            focusAlarmSound={data.focusAlarmSound}
+            focusBackgroundMusic={data.focusBackgroundMusic}
+            focusBackgroundTrack={data.focusBackgroundTrack}
+            onSavePreferences={saveFocusPreferences}
+          />
+        </div>
       </DashboardLayout>
       {notice && <div className="toast" role="status">{notice}</div>}
     </>

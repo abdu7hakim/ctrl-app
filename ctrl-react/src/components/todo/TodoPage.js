@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createId } from '../../utils/helpers';
+import { isTodoUrgent } from '../../utils/todoDeadlines';
 
 function TodoPage({ todos, onChange }) {
   const [filter, setFilter] = useState('all');
@@ -9,6 +10,14 @@ function TodoPage({ todos, onChange }) {
   const [form, setForm] = useState({ title: '', description: '', dueDate: '' });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', description: '', dueDate: '' });
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [warningTodoId, setWarningTodoId] = useState(null);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setCurrentTime(new Date()), 30 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const visibleTodos = useMemo(() => todos.filter((todo) => {
     const matchesStatus = filter === 'all' || todo.status === filter;
     const matchesQuery = `${todo.title} ${todo.description || ''}`.toLowerCase().includes(query.toLowerCase());
@@ -68,12 +77,13 @@ function TodoPage({ todos, onChange }) {
 
   return (
     <div className="page-content">
-      <div className="page-intro"><div><span className="eyebrow">KUNLIK REJANGIZ</span><h2>Vazifalar</h2><p>Rejalaringizni yozib boring va har bir qadamni belgilang.</p></div><span className="date-pill"><i className="ph ph-calendar-blank" />{new Date().toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
       <div className="todo-layout">
         <section className="surface-card todo-list-panel">
           <div className="todo-toolbar"><div className="filter-tabs" role="group" aria-label="Vazifalarni saralash">{[['all', 'Barchasi'], ['open', 'Ochiq'], ['done', 'Bajarilgan']].map(([value, label]) => <button key={value} className={filter === value ? 'filter-active' : ''} onClick={() => setFilter(value)}>{label}<span>{value === 'all' ? todos.length : todos.filter((todo) => todo.status === value).length}</span></button>)}</div><label className="search-field"><i className="ph ph-magnifying-glass" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Vazifani qidirish" /></label></div>
           <div className="todo-items">
-            {visibleTodos.map((todo) => <article key={todo.id} className={`todo-item ${todo.status === 'done' ? 'todo-item-done' : ''}`}>
+            {visibleTodos.map((todo) => {
+              const urgent = isTodoUrgent(todo, currentTime);
+              return <article key={todo.id} className={`todo-item ${todo.status === 'done' ? 'todo-item-done' : ''} ${urgent ? 'todo-item-urgent' : ''}`}>
               <button className={`todo-check ${todo.status === 'done' ? 'todo-check-active' : ''}`} aria-label={todo.status === 'done' ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash'} onClick={() => toggleTodo(todo.id)} disabled={saving}><i className="ph ph-check" /></button>
               {editingId === todo.id ? (
                 <div className="todo-item-copy todo-edit-fields">
@@ -82,8 +92,14 @@ function TodoPage({ todos, onChange }) {
                   <input aria-label="Muddatni tahrirlash" type="date" value={editForm.dueDate} onChange={(event) => setEditForm({ ...editForm, dueDate: event.target.value })} disabled={saving} />
                 </div>
               ) : (
-                <div className="todo-item-copy"><h3>{todo.title}</h3>{todo.description && <p>{todo.description}</p>}{todo.dueDate && <span className="todo-due"><i className="ph ph-clock" /> {todo.dueDate}</span>}</div>
+                <div className="todo-item-copy">
+                  <h3>{todo.title}</h3>
+                  {todo.description && <p>{todo.description}</p>}
+                  {todo.dueDate && <span className={`todo-due ${urgent ? 'todo-due-urgent' : ''}`}><i className="ph ph-clock" /> {todo.dueDate}</span>}
+                  {urgent && warningTodoId === todo.id && <p className="todo-deadline-warning" role="alert">Bu vazifani bugun soat 23:59 gacha bajaring. Bajarilmasa, avtomatik o‘chiriladi.</p>}
+                </div>
               )}
+              {editingId !== todo.id && urgent && <button className="todo-deadline-alert" type="button" aria-label={`${todo.title} uchun muddat ogohlantirishi`} aria-expanded={warningTodoId === todo.id} onClick={() => setWarningTodoId((current) => current === todo.id ? null : todo.id)}><i className="ph ph-warning-circle" aria-hidden="true" /></button>}
               {editingId === todo.id ? (
                 <>
                   <button className="icon-button" aria-label="Vazifa tahririni saqlash" onClick={saveEdit} disabled={saving}><i className="ph ph-check" /></button>
@@ -95,7 +111,8 @@ function TodoPage({ todos, onChange }) {
                   <button className="icon-button danger-button" aria-label={`${todo.title} vazifasini o‘chirish`} onClick={() => removeTodo(todo.id)} disabled={saving}><i className="ph ph-trash" /></button>
                 </>
               )}
-            </article>)}
+            </article>;
+            })}
             {!visibleTodos.length && <div className="empty-state"><i className="ph ph-notepad" /><p>{query ? 'Qidiruv bo‘yicha vazifa topilmadi.' : 'Bu ro‘yxatda hali vazifa yo‘q.'}</p></div>}
           </div>
         </section>

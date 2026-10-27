@@ -61,9 +61,8 @@ function HabitsPage({ habits, onChange }) {
 
   return (
     <div className="page-content">
-      <div className="page-intro"><div><span className="eyebrow">IZCHILLIK — KALIT</span><h2>Odatlar</h2><p>Har kuni takrorlang. Kichik odatlar katta o‘zgarishlar yaratadi.</p></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${habits.length ? (doneCount / habits.length) * 100 : 0}%` }}><strong>{habits.length ? Math.round((doneCount / habits.length) * 100) : 0}<small>%</small></strong></span><span>Bugungi natija</span></div></div>
       <div className="habits-layout">
-        <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">BUGUN</span><h3>Odatlarim <span className="heading-count">{doneCount}/{habits.length}</span></h3></div><span className="date-pill">{new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+        <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">BUGUN</span><h3>Odatlarim <span className="heading-count">{doneCount}/{habits.length}</span></h3></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${habits.length ? (doneCount / habits.length) * 100 : 0}%` }}><strong>{habits.length ? Math.round((doneCount / habits.length) * 100) : 0}<small>%</small></strong></span><span>Bugungi natija</span></div></div>
           {habits.length ? <div className="habit-list">{habits.map((habit) => {
             const completed = Boolean(habit.completions?.[today]);
             return <article className={`habit-item ${completed ? 'habit-item-done' : ''}`} key={habit.id} style={{ '--habit-color': habit.color }}>
