@@ -7,10 +7,10 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import AuthScreen from './components/auth/AuthScreen';
 import App from './App';
 import TodoPage from './components/todo/TodoPage';
+import { createProfileImageDataUrl } from './utils/profileImage';
 import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
 import { colorThemes } from './utils/themes';
 import { getTodoDeadline, isTodoOverdue, isTodoUrgent } from './utils/todoDeadlines';
@@ -18,16 +18,15 @@ import { createFocusMusic, focusMusicOptions } from './utils/focusMusic';
 
 const originalAudioContext = window.AudioContext;
 
+jest.mock('./utils/profileImage', () => ({
+  ...jest.requireActual('./utils/profileImage'),
+  createProfileImageDataUrl: jest.fn(),
+}));
+
 jest.mock('./firebase', () => ({
   auth: { currentUser: { uid: 'user-1', email: 'aziza@example.com' } },
   db: {},
   storage: {},
-}));
-
-jest.mock('firebase/storage', () => ({
-  getDownloadURL: jest.fn(),
-  ref: jest.fn((_storage, path) => ({ path })),
-  uploadBytes: jest.fn(),
 }));
 
 jest.mock('firebase/auth', () => ({
@@ -74,20 +73,19 @@ beforeEach(() => {
   EmailAuthProvider.credential.mockImplementation((email, password) => ({ email, password }));
   doc.mockImplementation((_db, name, id) => ({ name, id }));
   collection.mockImplementation((_db, name) => ({ name }));
-  ref.mockImplementation((_storage, path) => ({ path }));
   increment.mockImplementation((amount) => ({ increment: amount }));
   serverTimestamp.mockReturnValue('server-timestamp');
   updateDoc.mockResolvedValue();
+  createProfileImageDataUrl.mockResolvedValue('data:image/jpeg;base64,local-avatar');
   reauthenticateWithCredential.mockResolvedValue();
   updatePassword.mockResolvedValue();
-  uploadBytes.mockResolvedValue();
-  getDownloadURL.mockResolvedValue('https://storage.example.com/users/user-1/profile/avatar');
   setDoc.mockResolvedValue();
   addDoc.mockResolvedValue({ id: 'message-1' });
   createUserWithEmailAndPassword.mockResolvedValue({
     user: { uid: 'new-user', email: 'new@example.com' },
   });
   getDoc.mockResolvedValue({ exists: () => true, data: () => storedData });
+  window.localStorage.clear();
   onAuthStateChanged.mockImplementation((_auth, callback) => {
     callback({ uid: 'user-1', email: 'aziza@example.com', displayName: 'Aziza Aliyeva' });
     return jest.fn();
@@ -158,7 +156,7 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
   fireEvent.change(screen.getByLabelText('Vazifa nomi'), { target: { value: 'React o‘rganish' } });
   fireEvent.click(screen.getByRole('button', { name: /vazifa yaratish/i }));
 
-  expect(await screen.findByText('React o‘rganish')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'React o‘rganish' })).toBeInTheDocument();
   expect(updateDoc).toHaveBeenLastCalledWith(
     doc(expect.anything(), 'users', 'user-1'),
     expect.objectContaining({ todos: expect.arrayContaining([expect.objectContaining({ title: 'React o‘rganish', status: 'open' })]) }),
@@ -167,7 +165,7 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
   fireEvent.click(screen.getByRole('button', { name: 'React o‘rganish vazifasini tahrirlash' }));
   fireEvent.change(screen.getByLabelText('Vazifa nomini tahrirlash'), { target: { value: 'React ilovasini o‘rganish' } });
   fireEvent.click(screen.getByRole('button', { name: 'Vazifa tahririni saqlash' }));
-  expect(await screen.findByText('React ilovasini o‘rganish')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'React ilovasini o‘rganish' })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
   expect(await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' })).toBeInTheDocument();
@@ -178,6 +176,51 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
 
   fireEvent.click(screen.getByRole('button', { name: 'React ilovasini o‘rganish vazifasini o‘chirish' }));
   expect(await screen.findByText('Bu ro‘yxatda hali vazifa yo‘q.')).toBeInTheDocument();
+});
+
+test('todo quick dates and priority are saved with the task', async () => {
+  jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
+  const onChange = jest.fn().mockResolvedValue();
+  render(<TodoPage todos={[]} onChange={onChange} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bugun' }));
+  expect(screen.getByLabelText('Muddat (ixtiyoriy)').value).toBe('2026-10-28');
+  fireEvent.click(screen.getByRole('button', { name: 'Ertaga' }));
+  expect(screen.getByLabelText('Muddat (ixtiyoriy)').value).toBe('2026-10-29');
+  fireEvent.click(screen.getByRole('button', { name: 'Keyingi dushanba' }));
+  expect(screen.getByLabelText('Muddat (ixtiyoriy)').value).toBe('2026-11-02');
+  fireEvent.change(screen.getByLabelText('Muhimlik darajasi'), { target: { value: 'high' } });
+  fireEvent.change(screen.getByLabelText('Vazifa nomi'), { target: { value: 'Muhim topshiriq' } });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /vazifa yaratish/i }));
+    await Promise.resolve();
+  });
+
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([
+    expect.objectContaining({ title: 'Muhim topshiriq', dueDate: '2026-11-02', priority: 'high' }),
+  ])));
+  jest.useRealTimers();
+});
+
+test('task play button starts the task-specific focus timer and opens focus page', async () => {
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({
+      ...storedData,
+      focusDurationMinutes: 1,
+      todos: [{ id: 'todo-focus-1', title: 'Hisobot yozish', status: 'open' }],
+    }),
+  });
+  render(<App />);
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  fireEvent.click(within(navigation).getByRole('button', { name: /vazifalar/i }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hisobot yozish uchun diqqat vaqtini boshlash' }));
+
+  expect(await screen.findByText('Fokusdagi vazifa')).toBeInTheDocument();
+  expect(screen.getByText('Hisobot yozish', { selector: 'strong' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Pauza' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: '01:00 qoldi' })).toBeInTheDocument();
 });
 
 test('deadline-day open tasks show a warning and completed tasks do not', () => {
@@ -282,27 +325,49 @@ test('password change reauthenticates and validates password confirmation', asyn
   expect(updatePassword).toHaveBeenCalledTimes(1);
 });
 
-test('profile image upload validates and saves the photo to Storage and the user profile', async () => {
+test('profile image upload saves a resized image locally without writing it to Firebase', async () => {
   await openPage('Profil');
   const uploadInput = screen.getByLabelText('Profil rasmini yuklash');
   const image = new File(['profile image'], 'profile.png', { type: 'image/png' });
   fireEvent.change(uploadInput, { target: { files: [image] } });
 
   expect(await screen.findByAltText('Aziza profil rasmi')).toBeInTheDocument();
-  expect(ref).toHaveBeenCalledWith({}, 'users/user-1/profile/avatar');
-  expect(uploadBytes).toHaveBeenCalledWith(
-    { path: 'users/user-1/profile/avatar' },
-    image,
-    { contentType: 'image/png' },
+  expect(createProfileImageDataUrl).toHaveBeenCalledWith(image);
+  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBe('data:image/jpeg;base64,local-avatar');
+  expect(updateProfile).not.toHaveBeenCalledWith(expect.anything(), { photoURL: expect.anything() });
+  expect(updateDoc).not.toHaveBeenCalledWith(expect.anything(), { photoURL: expect.anything() });
+});
+
+test('profile image is restored from local storage after loading the account', async () => {
+  window.localStorage.setItem('ctrl-profile-image-user-1', 'data:image/jpeg;base64,saved-avatar');
+
+  await openPage('Profil');
+
+  expect(await screen.findByAltText('Aziza profil rasmi')).toHaveAttribute(
+    'src',
+    'data:image/jpeg;base64,saved-avatar',
   );
-  expect(updateProfile).toHaveBeenCalledWith(
-    expect.objectContaining({ uid: 'user-1' }),
-    { photoURL: 'https://storage.example.com/users/user-1/profile/avatar' },
-  );
-  expect(updateDoc).toHaveBeenCalledWith(
-    { name: 'users', id: 'user-1' },
-    { photoURL: 'https://storage.example.com/users/user-1/profile/avatar' },
-  );
+});
+
+test('profile image does not fall back to a Firebase photo URL when no local image exists', async () => {
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ ...storedData, photoURL: 'https://storage.example.com/previous-avatar' }),
+  });
+  onAuthStateChanged.mockImplementation((_auth, callback) => {
+    callback({
+      uid: 'user-1',
+      email: 'aziza@example.com',
+      displayName: 'Aziza Aliyeva',
+      photoURL: 'https://storage.example.com/previous-auth-avatar',
+    });
+    return jest.fn();
+  });
+
+  await openPage('Profil');
+
+  expect(screen.queryByAltText('Aziza profil rasmi')).not.toBeInTheDocument();
+  expect(screen.getAllByText('AA').length).toBeGreaterThan(0);
 });
 
 test('profile image upload rejects unsupported image types', async () => {
@@ -313,7 +378,7 @@ test('profile image upload rejects unsupported image types', async () => {
   });
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Rasm JPG, PNG yoki WebP formatida bo‘lishi kerak.');
-  expect(uploadBytes).not.toHaveBeenCalled();
+  expect(createProfileImageDataUrl).not.toHaveBeenCalled();
 });
 
 test('profile image upload rejects files larger than 5 MB', async () => {
@@ -322,7 +387,7 @@ test('profile image upload rejects files larger than 5 MB', async () => {
   fireEvent.change(screen.getByLabelText('Profil rasmini yuklash'), { target: { files: [image] } });
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Rasm hajmi 5 MB dan oshmasligi kerak.');
-  expect(uploadBytes).not.toHaveBeenCalled();
+  expect(createProfileImageDataUrl).not.toHaveBeenCalled();
 });
 
 test('dark mode preference is saved to the signed-in user document', async () => {
@@ -424,6 +489,50 @@ test('a completed focus session uses Firestore atomic increments', async () => {
   expect(updateDoc).toHaveBeenCalledWith(
     expect.anything(),
     { focusSessions: { increment: 1 }, focusMinutes: { increment: 25 } },
+  );
+  jest.useRealTimers();
+});
+
+test('focus task picker accumulates completed focus minutes on the selected task', async () => {
+  const task = { id: 'todo-focus', title: 'Kitob o‘qish', status: 'open', focusMinutes: 5 };
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ ...storedData, focusDurationMinutes: 1, todos: [task] }),
+  });
+  window.AudioContext = jest.fn(() => ({
+    state: 'running',
+    currentTime: 0,
+    destination: {},
+    createOscillator: () => ({
+      frequency: { setValueAtTime: jest.fn() },
+      connect: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+    }),
+    createGain: () => ({
+      gain: { setValueAtTime: jest.fn(), exponentialRampToValueAtTime: jest.fn() },
+      connect: jest.fn(),
+    }),
+    close: jest.fn(),
+  }));
+  render(<App />);
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  fireEvent.click(within(navigation).getByRole('button', { name: /diqqat vaqti/i }));
+  fireEvent.change(screen.getByLabelText('Fokus vazifasi'), { target: { value: 'todo-focus' } });
+
+  expect(screen.getByText('Kitob o‘qish', { selector: 'strong' })).toBeInTheDocument();
+  jest.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Boshlash' }));
+  act(() => jest.advanceTimersByTime(60 * 1000));
+  await act(async () => Promise.resolve());
+
+  expect(updateDoc).toHaveBeenLastCalledWith(
+    { name: 'users', id: 'user-1' },
+    {
+      focusSessions: { increment: 1 },
+      focusMinutes: { increment: 1 },
+      todos: [expect.objectContaining({ id: 'todo-focus', focusMinutes: 6 })],
+    },
   );
   jest.useRealTimers();
 });

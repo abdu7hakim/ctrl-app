@@ -6,8 +6,8 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, db, storage } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { createProfileImageDataUrl, profileImageStorageKey } from '../../utils/profileImage';
 
 const maxProfileImageSize = 5 * 1024 * 1024;
 const allowedProfileImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -87,11 +87,12 @@ function ProfilePage({ user, onSave }) {
         throw new Error('Rasm yuklash uchun hisobingizga qayta kiring.');
       }
 
-      const imageRef = ref(storage, `users/${user.uid}/profile/avatar`);
-      await uploadBytes(imageRef, image, { contentType: image.type });
-      const photoURL = await getDownloadURL(imageRef);
-      await updateProfile(firebaseUser, { photoURL });
-      await updateDoc(doc(db, 'users', user.uid), { photoURL });
+      const photoURL = await createProfileImageDataUrl(image);
+      try {
+        window.localStorage.setItem(profileImageStorageKey(user.uid), photoURL);
+      } catch (storageError) {
+        throw new Error('Profil rasmini brauzer xotirasiga saqlab bo‘lmadi. Boshqa yoki kichikroq rasm tanlang.');
+      }
       onSave({ ...user, photoURL });
       setSaved(true);
     } catch (uploadError) {

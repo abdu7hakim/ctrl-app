@@ -42,7 +42,7 @@ const pageDescriptions = {
   },
   settings: {
     subtitle: 'ILOVA SOZLAMALARI',
-    description: 'CTRL ilovasining ko‘rinishini o‘zingizga moslang.',
+    description: 'CTRL App ilovasining ko‘rinishini o‘zingizga moslang.',
   },
 };
 
@@ -61,7 +61,7 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
       {menuOpen && <button className="sidebar-backdrop" aria-label="Menyuni yopish" onClick={() => setMenuOpen(false)} />}
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <button className="brand sidebar-brand" onClick={() => navigate('dashboard')}>
-          <span className="brand-mark">C</span><span>CTRL</span>
+          <img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /><span>CTRL App</span>
         </button>
         <div className="sidebar-label">ISH MAYDONI</div>
         <nav className="side-nav" aria-label="Asosiy menyu">
@@ -78,7 +78,7 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
             {page === 'settings' && <i className="ph ph-caret-right nav-current" aria-hidden="true" />}
           </button>
           <button className="nav-link logout-link" onClick={onLogout}><i className="ph ph-sign-out" /><span>Chiqish</span></button>
-          <span className="sidebar-version">CTRL · Shaxsiy unumdorlik</span>
+          <span className="sidebar-version">CTRL App · Shaxsiy unumdorlik</span>
         </div>
       </aside>
       <main className="main-area">

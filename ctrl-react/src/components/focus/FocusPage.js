@@ -13,6 +13,7 @@ function isValidDuration(value) {
 }
 
 function FocusPage({
+  todos = [],
   onSessionComplete,
   focusDurationMinutes,
   breakDurationMinutes,
@@ -20,6 +21,7 @@ function FocusPage({
   focusBackgroundMusic,
   focusBackgroundTrack,
   onSavePreferences,
+  onRegisterTaskStarter,
 }) {
   const [mode, setMode] = useState('focus');
   const [focusDraft, setFocusDraft] = useState(String(focusDurationMinutes));
@@ -35,15 +37,59 @@ function FocusPage({
   const [audioError, setAudioError] = useState('');
   const [completedPending, setCompletedPending] = useState(false);
   const [completedMinutes, setCompletedMinutes] = useState(focusDurationMinutes);
+  const [focusedTaskId, setFocusedTaskId] = useState('');
+  const [completedTaskId, setCompletedTaskId] = useState('');
   const onCompleteRef = useRef(onSessionComplete);
   const onSavePreferencesRef = useRef(onSavePreferences);
   const audioContextRef = useRef(null);
+  const openTodos = todos.filter((todo) => todo.status !== 'done');
+  const focusedTask = openTodos.find((todo) => todo.id === focusedTaskId);
   const activeDuration = mode === 'focus' ? focusDurationMinutes : breakDurationMinutes;
   const circumference = 2 * Math.PI * 138;
   const progress = 1 - remaining / (activeDuration * 60);
 
   useEffect(() => { onCompleteRef.current = onSessionComplete; }, [onSessionComplete]);
   useEffect(() => { onSavePreferencesRef.current = onSavePreferences; }, [onSavePreferences]);
+
+  const prepareAudio = useCallback(() => {
+    setAudioError('');
+    if (!audioContextRef.current) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        try {
+          audioContextRef.current = new AudioContextClass();
+        } catch (audioContextError) {
+          console.error('Ovoz qurilmasini ishga tushirishda xatolik:', audioContextError);
+          setAudioError('Ovoz signalini yoqib bo‘lmadi. Brauzer ovoz sozlamalarini tekshiring.');
+        }
+      }
+    }
+    if (audioContextRef.current?.state === 'suspended') {
+      audioContextRef.current.resume().catch((audioResumeError) => {
+        console.error('Ovoz qurilmasini ishga tushirishda xatolik:', audioResumeError);
+        setAudioError('Ovoz signalini yoqib bo‘lmadi. Brauzer ovoz sozlamalarini tekshiring.');
+      });
+    } else if (!audioContextRef.current) {
+      setAudioError('Brauzeringiz ovozli signalni qo‘llab-quvvatlamaydi.');
+    }
+  }, []);
+
+  const startTask = useCallback((todo) => {
+    if (saving || completedPending) return false;
+    prepareAudio();
+    setMode('focus');
+    setRemaining(focusDurationMinutes * 60);
+    setFocusedTaskId(todo.id);
+    setError('');
+    setRunning(true);
+    return true;
+  }, [completedPending, focusDurationMinutes, prepareAudio, saving]);
+
+  useEffect(() => {
+    if (!onRegisterTaskStarter) return undefined;
+    onRegisterTaskStarter(startTask);
+    return () => onRegisterTaskStarter(null);
+  }, [onRegisterTaskStarter, startTask]);
 
   useEffect(() => {
     setFocusDraft(String(focusDurationMinutes));
@@ -62,22 +108,24 @@ function FocusPage({
     }
   }, []);
 
-  const saveCompletedSession = useCallback(async (duration = completedMinutes) => {
+  const saveCompletedSession = useCallback(async (duration = completedMinutes, taskId = focusedTaskId) => {
     setSaving(true);
     setError('');
     try {
-      await onCompleteRef.current(duration);
+      await onCompleteRef.current(duration, taskId || null);
       setCompletedPending(false);
+      setCompletedTaskId('');
       setRemaining(duration * 60);
     } catch (saveError) {
       console.error('Fokus sessiyasini saqlashda xatolik:', saveError);
       setCompletedPending(true);
       setCompletedMinutes(duration);
+      setCompletedTaskId(taskId);
       setError(saveError.message || 'Sessiyani saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setSaving(false);
     }
-  }, [completedMinutes]);
+  }, [completedMinutes, focusedTaskId]);
 
   const playAlarm = useCallback(() => {
     try {
@@ -129,26 +177,7 @@ function FocusPage({
       return;
     }
 
-    setAudioError('');
-    if (!audioContextRef.current) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        try {
-          audioContextRef.current = new AudioContextClass();
-        } catch (audioContextError) {
-          console.error('Ovoz qurilmasini ishga tushirishda xatolik:', audioContextError);
-          setAudioError('Ovoz signalini yoqib bo‘lmadi. Brauzer ovoz sozlamalarini tekshiring.');
-        }
-      }
-    }
-    if (audioContextRef.current?.state === 'suspended') {
-      audioContextRef.current.resume().catch((audioResumeError) => {
-        console.error('Ovoz qurilmasini ishga tushirishda xatolik:', audioResumeError);
-        setAudioError('Ovoz signalini yoqib bo‘lmadi. Brauzer ovoz sozlamalarini tekshiring.');
-      });
-    } else if (!audioContextRef.current) {
-      setAudioError('Brauzeringiz ovozli signalni qo‘llab-quvvatlamaydi.');
-    }
+    prepareAudio();
     setRunning(true);
   };
 
@@ -163,6 +192,14 @@ function FocusPage({
     if (saving || completedPending) return;
     setRunning(false);
     setRemaining(activeDuration * 60);
+    setError('');
+  };
+
+  const selectTask = (event) => {
+    if (running || saving || completedPending) return;
+    setFocusedTaskId(event.target.value);
+    setMode('focus');
+    setRemaining(focusDurationMinutes * 60);
     setError('');
   };
 
@@ -237,6 +274,13 @@ function FocusPage({
             <button type="button" className={mode === 'focus' ? 'timer-mode-active' : ''} onClick={() => selectMode('focus')} disabled={running || saving || completedPending}>Fokus · {focusDurationMinutes} daq</button>
             <button type="button" className={mode === 'break' ? 'timer-mode-active' : ''} onClick={() => selectMode('break')} disabled={running || saving || completedPending}>Tanaffus · {breakDurationMinutes} daq</button>
           </div>
+          <label className="focus-task-picker">Qaysi vazifa ustida ishlayapsiz?
+            <select aria-label="Fokus vazifasi" value={focusedTaskId} onChange={selectTask} disabled={running || saving || completedPending}>
+              <option value="">Vazifa tanlanmagan</option>
+              {openTodos.map((todo) => <option key={todo.id} value={todo.id}>{todo.title}</option>)}
+            </select>
+          </label>
+          {focusedTask && <p className="focus-task-label"><i className="ph ph-check-square" /> Fokusdagi vazifa <strong>{focusedTask.title}</strong></p>}
           <div className="timer-wrap">
             <svg viewBox="0 0 300 300" role="img" aria-label={`${displayTime} qoldi`}>
               <circle className="timer-track" cx="150" cy="150" r="138" />
@@ -246,7 +290,7 @@ function FocusPage({
           </div>
           <div className="timer-actions">
             {completedPending
-              ? <button className="button button-primary timer-start" onClick={() => saveCompletedSession()} disabled={saving}>{saving ? 'Saqlanmoqda...' : 'Saqlashni qayta urinish'}</button>
+              ? <button className="button button-primary timer-start" onClick={() => saveCompletedSession(completedMinutes, completedTaskId)} disabled={saving}>{saving ? 'Saqlanmoqda...' : 'Saqlashni qayta urinish'}</button>
               : <button className="button button-primary timer-start" onClick={start} disabled={saving || preferencesSaving}><i className={`ph ${running ? 'ph-pause' : 'ph-play'}`} />{running ? 'Pauza' : sessionPaused ? 'Davom ettirish' : 'Boshlash'}</button>}
             <button className="button button-secondary" onClick={reset} disabled={saving || preferencesSaving || completedPending}><i className="ph ph-arrow-counter-clockwise" /> {sessionPaused ? 'Yangi seans' : 'Qayta boshlash'}</button>
           </div>

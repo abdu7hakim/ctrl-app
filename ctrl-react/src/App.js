@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AuthScreen from './components/auth/AuthScreen';
 import DashboardLayout from './components/layout/DashboardLayout';
 import OverviewPage from './components/dashboard/OverviewPage';
@@ -10,6 +10,7 @@ import ContactPage from './components/contact/ContactPage';
 import SettingsPage from './components/settings/SettingsPage';
 import { defaultThemeId, getColorTheme } from './utils/themes';
 import { isTodoOverdue } from './utils/todoDeadlines';
+import { getStoredProfileImage } from './utils/profileImage';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
@@ -53,6 +54,15 @@ function App() {
   const authGeneration = useRef(0);
   const latestData = useRef(data);
   const expiryErrorKey = useRef('');
+  const focusTaskStarter = useRef(null);
+
+  const registerFocusTaskStarter = useCallback((starter) => {
+    focusTaskStarter.current = starter;
+  }, []);
+
+  const startTodoFocus = useCallback((todo) => {
+    if (focusTaskStarter.current?.(todo)) setPage('focus');
+  }, []);
 
   useEffect(() => {
     latestData.current = data;
@@ -83,11 +93,12 @@ function App() {
         return;
       }
 
+      const localPhotoURL = getStoredProfileImage(firebaseUser.uid);
       const identity = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         ...getNameParts(firebaseUser.displayName, firebaseUser.email),
-        photoURL: firebaseUser.photoURL || '',
+        photoURL: localPhotoURL,
       };
       setUser(identity);
       setAuthError('');
@@ -113,7 +124,7 @@ function App() {
             habits: Array.isArray(storedData.habits) ? storedData.habits : [],
             darkMode: typeof storedData.darkMode === 'boolean' ? storedData.darkMode : false,
             colorTheme: getColorTheme(storedData.colorTheme).id,
-            photoURL: typeof storedData.photoURL === 'string' ? storedData.photoURL : identity.photoURL,
+            photoURL: localPhotoURL,
             focusDurationMinutes: Number.isSafeInteger(storedData.focusDurationMinutes)
               && storedData.focusDurationMinutes > 0
               && storedData.focusDurationMinutes <= Math.floor(Number.MAX_SAFE_INTEGER / 60)
@@ -253,18 +264,29 @@ function App() {
     setData((current) => ({ ...current, [field]: value }));
   };
 
-  const saveFocusSession = async (minutes) => {
+  const saveFocusSession = async (minutes, todoId = null) => {
     if (!user || auth.currentUser?.uid !== user.uid) {
       throw new Error('Fokus sessiyasini saqlash uchun hisobingizga kiring.');
     }
-    await updateDoc(doc(db, 'users', user.uid), {
+    const updates = {
       focusSessions: increment(1),
       focusMinutes: increment(minutes),
-    });
+    };
+    let updatedTodos = latestData.current.todos;
+    if (todoId) {
+      updatedTodos = latestData.current.todos.map((todo) => (
+        todo.id === todoId
+          ? { ...todo, focusMinutes: (Number.isSafeInteger(todo.focusMinutes) ? todo.focusMinutes : 0) + minutes }
+          : todo
+      ));
+      updates.todos = updatedTodos;
+    }
+    await updateDoc(doc(db, 'users', user.uid), updates);
     setData((current) => ({
       ...current,
       focusSessions: (current.focusSessions || 0) + 1,
       focusMinutes: (current.focusMinutes || 0) + minutes,
+      ...(todoId ? { todos: updatedTodos } : {}),
     }));
   };
 
@@ -358,7 +380,7 @@ function App() {
 
   const pages = {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} />,
-    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} />,
+    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
@@ -388,6 +410,7 @@ function App() {
         {page !== 'focus' && (pages[page] || pages.dashboard)}
         <div hidden={page !== 'focus'}>
           <FocusPage
+            todos={data.todos}
             onSessionComplete={saveFocusSession}
             focusDurationMinutes={data.focusDurationMinutes}
             breakDurationMinutes={data.breakDurationMinutes}
@@ -395,6 +418,7 @@ function App() {
             focusBackgroundMusic={data.focusBackgroundMusic}
             focusBackgroundTrack={data.focusBackgroundTrack}
             onSavePreferences={saveFocusPreferences}
+            onRegisterTaskStarter={registerFocusTaskStarter}
           />
         </div>
       </DashboardLayout>

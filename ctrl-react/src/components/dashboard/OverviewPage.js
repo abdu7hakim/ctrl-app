@@ -31,9 +31,9 @@ function OverviewPage({ user, data, stats, onNavigate }) {
         </div>
         <div className="welcome-art" aria-hidden="true">
           <div className="welcome-orbit" />
-          <div className="welcome-logo-tile"><span className="brand-mark">C</span><i className="ph ph-sparkle" /></div>
+          <div className="welcome-logo-tile"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /><i className="ph ph-sparkle" /></div>
           <div className="welcome-preview">
-            <div className="welcome-preview-top"><strong>CTRL</strong><span><i className="ph ph-sun" /><span className="avatar">A</span></span></div>
+            <div className="welcome-preview-top"><strong>CTRL App</strong><span><i className="ph ph-sun" /><span className="avatar">A</span></span></div>
             <h3>Focus. Achieve. Grow.</h3>
             <p>Maqsadlaringizga yana bir qadam.</p>
             <div className="welcome-streak"><i className="ph ph-fire" /><strong>12</strong><span>kunlik izchillik</span><i className="ph ph-trend-up" /></div>

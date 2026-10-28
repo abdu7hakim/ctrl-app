@@ -2,16 +2,42 @@ import { useEffect, useMemo, useState } from 'react';
 import { createId } from '../../utils/helpers';
 import { isTodoUrgent } from '../../utils/todoDeadlines';
 
-function TodoPage({ todos, onChange }) {
+const priorities = [
+  { value: 'high', label: 'Yuqori' },
+  { value: 'medium', label: 'O‘rta' },
+  { value: 'low', label: 'Past' },
+];
+
+const getDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getQuickDueDates = () => {
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+  const nextMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysUntilMonday);
+  return [
+    { label: 'Bugun', value: getDateKey(today) },
+    { label: 'Ertaga', value: getDateKey(tomorrow) },
+    { label: 'Keyingi dushanba', value: getDateKey(nextMonday) },
+  ];
+};
+
+function TodoPage({ todos, onChange, onStartFocus }) {
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', dueDate: '' });
+  const [form, setForm] = useState({ title: '', description: '', dueDate: '', priority: 'medium' });
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', description: '', dueDate: '' });
+  const [editForm, setEditForm] = useState({ title: '', description: '', dueDate: '', priority: 'medium' });
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [warningTodoId, setWarningTodoId] = useState(null);
+  const quickDueDates = getQuickDueDates();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentTime(new Date()), 30 * 1000);
@@ -52,7 +78,7 @@ function TodoPage({ todos, onChange }) {
       status: 'open',
       createdAt: new Date().toISOString(),
     }, ...todos]);
-    if (saved) setForm({ title: '', description: '', dueDate: '' });
+    if (saved) setForm({ title: '', description: '', dueDate: '', priority: 'medium' });
   };
 
   const toggleTodo = (id) => saveTodos(todos.map((todo) => todo.id === id ? { ...todo, status: todo.status === 'done' ? 'open' : 'done' } : todo));
@@ -60,7 +86,12 @@ function TodoPage({ todos, onChange }) {
   const startEditing = (todo) => {
     setError('');
     setEditingId(todo.id);
-    setEditForm({ title: todo.title, description: todo.description || '', dueDate: todo.dueDate || '' });
+    setEditForm({
+      title: todo.title,
+      description: todo.description || '',
+      dueDate: todo.dueDate || '',
+      priority: priorities.some(({ value }) => value === todo.priority) ? todo.priority : 'medium',
+    });
   };
   const saveEdit = async () => {
     if (!editForm.title.trim()) {
@@ -74,6 +105,23 @@ function TodoPage({ todos, onChange }) {
     )));
     if (saved) setEditingId(null);
   };
+
+  const renderQuickDueDates = (setTargetForm, selectedDate, disabled) => (
+    <div className="todo-quick-dates" role="group" aria-label="Muddatni tez tanlash">
+      {quickDueDates.map(({ label, value }) => (
+        <button
+          key={label}
+          type="button"
+          className={`todo-quick-date ${selectedDate === value ? 'todo-quick-date-active' : ''}`}
+          aria-pressed={selectedDate === value}
+          onClick={() => setTargetForm((current) => ({ ...current, dueDate: value }))}
+          disabled={disabled}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="page-content">
@@ -90,15 +138,21 @@ function TodoPage({ todos, onChange }) {
                   <input aria-label="Vazifa nomini tahrirlash" value={editForm.title} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} maxLength="120" disabled={saving} />
                   <textarea aria-label="Izohni tahrirlash" value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} maxLength="500" rows="2" disabled={saving} />
                   <input aria-label="Muddatni tahrirlash" type="date" value={editForm.dueDate} onChange={(event) => setEditForm({ ...editForm, dueDate: event.target.value })} disabled={saving} />
+                  {renderQuickDueDates(setEditForm, editForm.dueDate, saving)}
+                  <select aria-label="Muhimlik darajasini tahrirlash" value={editForm.priority} onChange={(event) => setEditForm({ ...editForm, priority: event.target.value })} disabled={saving}>
+                    {priorities.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
+                  </select>
                 </div>
               ) : (
                 <div className="todo-item-copy">
-                  <h3>{todo.title}</h3>
+                  <div className="todo-title-row"><h3>{todo.title}</h3><span className={`todo-priority todo-priority-${priorities.some(({ value }) => value === todo.priority) ? todo.priority : 'medium'}`}>{priorities.find(({ value }) => value === todo.priority)?.label || 'O‘rta'}</span></div>
                   {todo.description && <p>{todo.description}</p>}
                   {todo.dueDate && <span className={`todo-due ${urgent ? 'todo-due-urgent' : ''}`}><i className="ph ph-clock" /> {todo.dueDate}</span>}
+                  {todo.focusMinutes > 0 && <span className="todo-focus-time"><i className="ph ph-timer" /> Fokus: {todo.focusMinutes} daq</span>}
                   {urgent && warningTodoId === todo.id && <p className="todo-deadline-warning" role="alert">Bu vazifani bugun soat 23:59 gacha bajaring. Bajarilmasa, avtomatik o‘chiriladi.</p>}
                 </div>
               )}
+              {editingId !== todo.id && todo.status !== 'done' && <button className="todo-focus-button" type="button" aria-label={`${todo.title} uchun diqqat vaqtini boshlash`} onClick={() => onStartFocus?.(todo)} disabled={saving}><i className="ph ph-play" aria-hidden="true" /></button>}
               {editingId !== todo.id && urgent && <button className="todo-deadline-alert" type="button" aria-label={`${todo.title} uchun muddat ogohlantirishi`} aria-expanded={warningTodoId === todo.id} onClick={() => setWarningTodoId((current) => current === todo.id ? null : todo.id)}><i className="ph ph-warning-circle" aria-hidden="true" /></button>}
               {editingId === todo.id ? (
                 <>
@@ -121,6 +175,8 @@ function TodoPage({ todos, onChange }) {
             <label>Vazifa nomi<input autoFocus name="title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Masalan, kitob o‘qish" maxLength="120" required disabled={saving} /></label>
             <label>Izoh <span className="optional">(ixtiyoriy)</span><textarea rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Qo‘shimcha ma’lumot..." maxLength="500" disabled={saving} /></label>
             <label>Muddat <span className="optional">(ixtiyoriy)</span><input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} disabled={saving} /></label>
+            {renderQuickDueDates(setForm, form.dueDate, saving)}
+            <label>Muhimlik darajasi<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} disabled={saving}>{priorities.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}</select></label>
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button button-primary button-wide" disabled={saving}><i className="ph ph-plus" /> {saving ? 'Saqlanmoqda...' : 'Vazifa yaratish'}</button>
           </form>

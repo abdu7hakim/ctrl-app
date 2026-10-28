@@ -82,7 +82,7 @@ function AuthScreen({ onAuthenticated }) {
   return (
     <main className="auth-page">
       <section className="auth-art">
-        <div className="brand"><span className="brand-mark">C</span> CTRL</div>
+        <div className="brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
         <div className="auth-hero">
           <span className="eyebrow">YOUR PERSONAL SPACE</span>
           <h1>Hayotingizni<br />boshqarishni<br /><span>bugun boshlang.</span></h1>
@@ -92,7 +92,7 @@ function AuthScreen({ onAuthenticated }) {
       </section>
       <section className="auth-panel">
         <div className="auth-card">
-          <div className="auth-mobile-brand"><span className="brand-mark">C</span> CTRL</div>
+          <div className="auth-mobile-brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
           <div className="auth-heading">
             <span className="eyebrow">{mode === 'signup' ? 'BOSHLASH' : 'QAYTGANINGIZDAN XURSANDMIZ'}</span>
             <h2>{mode === 'signup' ? 'Hisob yarating' : 'Hisobingizga kiring'}</h2>
