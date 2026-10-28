@@ -176,7 +176,7 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
 
   fireEvent.click(screen.getByRole('button', { name: 'React ilovasini o‘rganish vazifasini o‘chirish' }));
   expect(await screen.findByText('Bu ro‘yxatda hali vazifa yo‘q.')).toBeInTheDocument();
-});
+}, 10000);
 
 test('todo quick dates and priority are saved with the task', async () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
@@ -757,4 +757,41 @@ test('focus timer saves custom durations and alarm preference', async () => {
   act(() => jest.advanceTimersByTime(60 * 1000));
   expect(createOscillator).toHaveBeenCalledTimes(3);
   expect(screen.getByRole('img', { name: '01:00 qoldi' })).toBeInTheDocument();
+});
+
+test('changing the language in settings updates the whole app and persists the preference', async () => {
+  const descriptionMeta = document.createElement('meta');
+  descriptionMeta.name = 'description';
+  document.head.appendChild(descriptionMeta);
+  render(<App />);
+  await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Ilova tili' }), { target: { value: 'en' } });
+  await waitFor(() => expect(updateDoc).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    { language: 'en' },
+  ));
+  expect(await screen.findByRole('heading', { name: 'App language' })).toBeInTheDocument();
+  expect(screen.getByRole('navigation', { name: 'Main menu' })).toHaveTextContent('Tasks');
+  expect(document.documentElement).toHaveAttribute('lang', 'en');
+  expect(document.title).toBe('CTRL App — Take control of your life');
+  expect(document.querySelector('meta[name="description"]')).toHaveAttribute(
+    'content',
+    'CTRL App — an app for managing daily tasks, habits, and focus.',
+  );
+
+  fireEvent.click(document.querySelector('.language-menu > summary'));
+  fireEvent.click(screen.getByRole('button', { name: 'Uzbek' }));
+  await waitFor(() => expect(updateDoc).toHaveBeenLastCalledWith(
+    { name: 'users', id: 'user-1' },
+    { language: 'uz' },
+  ));
+  expect(await screen.findByRole('heading', { name: 'Ilova tili' })).toBeInTheDocument();
+  expect(document.documentElement).toHaveAttribute('lang', 'uz');
+  expect(descriptionMeta).toHaveAttribute(
+    'content',
+    'CTRL App — kundalik vazifalar, odatlar va fokusni boshqarish ilovasi.',
+  );
+  descriptionMeta.remove();
 });

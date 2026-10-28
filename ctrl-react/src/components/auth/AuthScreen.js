@@ -7,8 +7,10 @@ import {
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { defaultThemeId } from '../../utils/themes';
+import { translate } from '../../utils/language';
 
-function AuthScreen({ onAuthenticated }) {
+function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
+  const t = (text) => translate(text, language);
   const [mode, setMode] = useState('signup');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -49,6 +51,7 @@ function AuthScreen({ onAuthenticated }) {
           focusAlarmSound: 'bell',
           focusBackgroundMusic: false,
           focusBackgroundTrack: 'ambient',
+          language,
         }, { merge: true });
 
         onAuthenticated?.({
@@ -71,6 +74,14 @@ function AuthScreen({ onAuthenticated }) {
         errorMessage = "Email yoki parol xato.";
       } else if (submitError.code === 'auth/weak-password') {
         errorMessage = "Parol juda oddiy. Kamida 6 ta belgi kiriting.";
+      } else if (submitError.code === 'auth/invalid-email') {
+        errorMessage = 'Email manzili noto‘g‘ri.';
+      } else if (submitError.code === 'auth/user-not-found') {
+        errorMessage = 'Bu email bilan ro‘yxatdan o‘tgan hisob topilmadi.';
+      } else if (submitError.code === 'auth/too-many-requests') {
+        errorMessage = 'Juda ko‘p urinish bo‘ldi. Birozdan so‘ng qayta urinib ko‘ring.';
+      } else if (submitError.code === 'auth/network-request-failed') {
+        errorMessage = 'Internet aloqasi yo‘q. Qayta urinib ko‘ring.';
       }
       
       setError(errorMessage);
@@ -84,40 +95,43 @@ function AuthScreen({ onAuthenticated }) {
       <section className="auth-art">
         <div className="brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
         <div className="auth-hero">
-          <span className="eyebrow">YOUR PERSONAL SPACE</span>
-          <h1>Hayotingizni<br />boshqarishni<br /><span>bugun boshlang.</span></h1>
-          <p>Vazifalar, odatlar va diqqat — barchasi bir joyda.</p>
+          <span className="eyebrow">{t('SHAXSIY MAKONINGIZ')}</span>
+          <h1>{t('Hayotingizni')}<br />{t('boshqarishni')}<br /><span>{t('bugun boshlang.')}</span></h1>
+          <p>{t('Vazifalar, odatlar va diqqat — barchasi bir joyda.')}</p>
         </div>
-        <div className="auth-art-footer">Fikringizni jamlang. Maqsad sari yuring.</div>
+        <div className="auth-art-footer">{t('Fikringizni jamlang. Maqsad sari yuring.')}</div>
       </section>
       <section className="auth-panel">
         <div className="auth-card">
+          <button className="auth-language-toggle" type="button" onClick={() => onChangeLanguage(language === 'uz' ? 'en' : 'uz')} aria-label={t('Tilni almashtirish')}>
+            <i className="ph ph-globe-hemisphere-west" aria-hidden="true" /> {language === 'uz' ? 'EN' : 'UZ'}
+          </button>
           <div className="auth-mobile-brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
           <div className="auth-heading">
-            <span className="eyebrow">{mode === 'signup' ? 'BOSHLASH' : 'QAYTGANINGIZDAN XURSANDMIZ'}</span>
-            <h2>{mode === 'signup' ? 'Hisob yarating' : 'Hisobingizga kiring'}</h2>
-            <p>{mode === 'signup' ? 'Bugundan unumli kunlar sari.' : 'Davom etish uchun ma’lumotlaringizni kiriting.'}</p>
+            <span className="eyebrow">{t(mode === 'signup' ? 'BOSHLASH' : 'QAYTGANINGIZDAN XURSANDMIZ')}</span>
+            <h2>{t(mode === 'signup' ? 'Hisob yarating' : 'Hisobingizga kiring')}</h2>
+            <p>{t(mode === 'signup' ? 'Bugundan unumli kunlar sari.' : 'Davom etish uchun ma’lumotlaringizni kiriting.')}</p>
           </div>
           <form className="form-stack" onSubmit={submit}>
             {mode === 'signup' && (
               <div className="form-row">
-                <label>Ism<input name="firstName" autoComplete="given-name" placeholder="Ismingiz" required /></label>
-                <label>Familiya<input name="lastName" autoComplete="family-name" placeholder="Familiyangiz" required /></label>
+                <label>{t('Ism')}<input name="firstName" autoComplete="given-name" placeholder={t('Ismingiz')} required /></label>
+                <label>{t('Familiya')}<input name="lastName" autoComplete="family-name" placeholder={t('Familiyangiz')} required /></label>
               </div>
             )}
-            <label>E-mail manzil<input name="email" type="email" autoComplete="email" placeholder="siz@example.com" required /></label>
-            <label>Parol<input name="password" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} minLength="6" placeholder="Kamida 6 ta belgi" required /></label>
-            {mode === 'signup' && <label className="check-label"><input type="checkbox" required /> Foydalanish shartlariga roziman</label>}
-            {error && <p className="form-error" role="alert">{error}</p>}
+            <label>{t('E-mail manzil')}            <input name="email" type="email" autoComplete="email" placeholder={language === 'en' ? 'you@example.com' : 'siz@example.com'} required /></label>
+            <label>{t('Parol')}<input name="password" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} minLength="6" placeholder={t('Kamida 6 ta belgi')} required /></label>
+            {mode === 'signup' && <label className="check-label"><input type="checkbox" required /> {t('Foydalanish shartlariga roziman')}</label>}
+            {error && <p className="form-error" role="alert">{t(error)}</p>}
             <button className="button button-primary button-wide" disabled={busy}>
-              {busy ? 'Kuting...' : mode === 'signup' ? 'Hisob yaratish' : 'Kirish'}
+              {t(busy ? 'Kuting...' : mode === 'signup' ? 'Hisob yaratish' : 'Kirish')}
               <i className="ph ph-arrow-right" aria-hidden="true" />
             </button>
           </form>
           <p className="auth-switch">
-            {mode === 'signup' ? 'Hisobingiz bormi?' : 'Hali hisobingiz yo‘qmi?'}
+            {t(mode === 'signup' ? 'Hisobingiz bormi?' : 'Hali hisobingiz yo‘qmi?')}
             {' '}<button type="button" className="text-button" onClick={() => { setError(''); setMode(mode === 'signup' ? 'login' : 'signup'); }}>
-              {mode === 'signup' ? 'Kirish' : 'Ro‘yxatdan o‘tish'}
+              {t(mode === 'signup' ? 'Kirish' : 'Ro‘yxatdan o‘tish')}
             </button>
           </p>
         </div>

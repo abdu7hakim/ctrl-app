@@ -11,6 +11,7 @@ import SettingsPage from './components/settings/SettingsPage';
 import { defaultThemeId, getColorTheme } from './utils/themes';
 import { isTodoOverdue } from './utils/todoDeadlines';
 import { getStoredProfileImage } from './utils/profileImage';
+import { getStoredLanguage, saveStoredLanguage, translate } from './utils/language';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
@@ -28,6 +29,7 @@ const initialData = {
   focusAlarmSound: 'bell',
   focusBackgroundMusic: false,
   focusBackgroundTrack: 'ambient',
+  language: 'uz',
 };
 
 function getNameParts(displayName, email) {
@@ -40,6 +42,7 @@ function getNameParts(displayName, email) {
 
 function App() {
   const [user, setUser] = useState(null);
+  const [language, setLanguageState] = useState(getStoredLanguage);
   const [page, setPage] = useState('dashboard');
   const [data, setData] = useState(initialData);
   const [darkMode, setDarkMode] = useState(false);
@@ -69,12 +72,22 @@ function App() {
   }, [data]);
 
   useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = language === 'en'
+      ? 'CTRL App — Take control of your life'
+      : 'CTRL App — Hayotingizni boshqaring';
+    const description = document.querySelector('meta[name="description"]');
+    if (description) {
+      description.setAttribute('content', language === 'en'
+        ? 'CTRL App — an app for managing daily tasks, habits, and focus.'
+        : 'CTRL App — kundalik vazifalar, odatlar va fokusni boshqarish ilovasi.');
+    }
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
     const palette = getColorTheme(colorTheme)[darkMode ? 'dark' : 'light'];
     Object.entries(palette).forEach(([name, value]) => {
       document.documentElement.style.setProperty(`--${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value);
     });
-  }, [darkMode, colorTheme]);
+  }, [darkMode, colorTheme, language]);
 
   useEffect(() => {
     let active = true;
@@ -144,9 +157,10 @@ function App() {
             focusBackgroundTrack: ['ambient', 'rain', 'soft'].includes(storedData.focusBackgroundTrack)
               ? storedData.focusBackgroundTrack
               : initialData.focusBackgroundTrack,
+            language: ['uz', 'en'].includes(storedData.language) ? storedData.language : getStoredLanguage(),
           };
           if (!snapshot.exists()) {
-            await setDoc(userRef, { ...profileDefaults, ...initialData }, { merge: true });
+            await setDoc(userRef, { ...profileDefaults, ...initialData, language: nextData.language }, { merge: true });
           } else {
             const missingProfile = {};
             Object.entries(profileDefaults).forEach(([key, value]) => {
@@ -168,6 +182,14 @@ function App() {
           if (active && generation === authGeneration.current) setData(nextData);
           if (active && generation === authGeneration.current) setDarkMode(nextData.darkMode);
           if (active && generation === authGeneration.current) setColorTheme(nextData.colorTheme);
+          if (active && generation === authGeneration.current) {
+            setLanguageState(nextData.language);
+            try {
+              saveStoredLanguage(nextData.language);
+            } catch (error) {
+              console.error('Til sozlamasini saqlashda xatolik:', error);
+            }
+          }
         } catch (error) {
           console.error('Foydalanuvchi ma’lumotlarini yuklashda xatolik:', error);
           if (active && generation === authGeneration.current) {
@@ -338,6 +360,38 @@ function App() {
     }
   };
 
+  const changeLanguage = async (nextLanguage) => {
+    if (!['uz', 'en'].includes(nextLanguage) || nextLanguage === language) return;
+    if (!user || auth.currentUser?.uid !== user.uid) {
+      try {
+        saveStoredLanguage(nextLanguage);
+        setLanguageState(nextLanguage);
+      } catch (error) {
+        console.error('Til sozlamasini saqlashda xatolik:', error);
+        setLanguageState(nextLanguage);
+        setNotice('Til sozlamasini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      }
+      return;
+    }
+
+    setThemeSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { language: nextLanguage });
+      setLanguageState(nextLanguage);
+      setData((current) => ({ ...current, language: nextLanguage }));
+      try {
+        saveStoredLanguage(nextLanguage);
+      } catch (error) {
+        console.error('Til sozlamasini brauzer xotirasiga saqlashda xatolik:', error);
+      }
+    } catch (error) {
+      console.error('Til sozlamasini saqlashda xatolik:', error);
+      setNotice('Til sozlamasini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -349,48 +403,55 @@ function App() {
   };
 
   if (authLoading) {
-    return <div className="app-loading" role="status">Hisob tekshirilmoqda...</div>;
+    return <div className="app-loading" role="status">{translate('Hisob tekshirilmoqda...', language)}</div>;
   }
   if (authError) {
     return (
       <main className="app-loading app-error" role="alert">
-        <p>{authError}</p>
-        <button className="button button-primary" onClick={() => { setAuthError(''); setAuthLoading(true); setReloadKey((key) => key + 1); }}>Qayta urinish</button>
+        <p>{translate(authError, language)}</p>
+        <button className="button button-primary" onClick={() => { setAuthError(''); setAuthLoading(true); setReloadKey((key) => key + 1); }}>{translate('Qayta urinish', language)}</button>
       </main>
     );
   }
   if (!user) {
-    return <AuthScreen onAuthenticated={(authenticatedUser) => {
-      setUser(authenticatedUser);
-      setReloadKey((key) => key + 1);
-    }} />;
+    return (
+      <>
+        <AuthScreen language={language} onChangeLanguage={changeLanguage} onAuthenticated={(authenticatedUser) => {
+          setUser(authenticatedUser);
+          setReloadKey((key) => key + 1);
+        }} />
+        {notice && <div className="toast" role="status">{translate(notice, language)}</div>}
+      </>
+    );
   }
   if (dataLoading) {
-    return <div className="app-loading" role="status">Ma’lumotlar yuklanmoqda...</div>;
+    return <div className="app-loading" role="status">{translate('Ma’lumotlar yuklanmoqda...', language)}</div>;
   }
   if (dataError) {
     return (
       <main className="app-loading app-error" role="alert">
-        <p>{dataError}</p>
-        <button className="button button-primary" onClick={() => setReloadKey((key) => key + 1)}>Qayta urinish</button>
-        <button className="text-button" onClick={logout}>Chiqish</button>
+        <p>{translate(dataError, language)}</p>
+        <button className="button button-primary" onClick={() => setReloadKey((key) => key + 1)}>{translate('Qayta urinish', language)}</button>
+        <button className="text-button" onClick={logout}>{translate('Chiqish', language)}</button>
       </main>
     );
   }
 
   const pages = {
-    dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} />,
-    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} />,
-    habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} />,
+    dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} language={language} />,
+    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} language={language} />,
+    habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} language={language} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
       setNotice('Profil ma’lumotlari saqlandi.');
-    }} />,
-    contact: <ContactPage user={user} onSend={() => setNotice('Xabaringiz qabul qilindi. Rahmat!')} />,
+    }} language={language} />,
+    contact: <ContactPage user={user} onSend={() => setNotice('Xabaringiz qabul qilindi. Rahmat!')} language={language} />,
     settings: <SettingsPage
       darkMode={darkMode}
       themeSaving={themeSaving}
       colorTheme={colorTheme}
+      language={language}
+      onChangeLanguage={changeLanguage}
       onToggleTheme={toggleTheme}
       onSelectColorTheme={saveColorTheme}
     />,
@@ -406,6 +467,8 @@ function App() {
         onNavigate={setPage}
         onToggleTheme={toggleTheme}
         onLogout={logout}
+        language={language}
+        onChangeLanguage={changeLanguage}
       >
         {page !== 'focus' && (pages[page] || pages.dashboard)}
         <div hidden={page !== 'focus'}>
@@ -419,10 +482,11 @@ function App() {
             focusBackgroundTrack={data.focusBackgroundTrack}
             onSavePreferences={saveFocusPreferences}
             onRegisterTaskStarter={registerFocusTaskStarter}
+            language={language}
           />
         </div>
       </DashboardLayout>
-      {notice && <div className="toast" role="status">{notice}</div>}
+      {notice && <div className="toast" role="status">{translate(notice, language)}</div>}
     </>
   );
 }

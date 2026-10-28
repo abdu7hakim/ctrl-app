@@ -352,6 +352,8 @@ button { cursor: pointer; }
 .theme-option-active { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 1px var(--primary); }
 .theme-option:disabled { opacity: .6; cursor: wait; }
 .theme-swatch { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; color: #fff; font-size: 14px; box-shadow: 0 2px 6px #0002; }
+.settings-language-select { display: grid; min-width: 126px; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.settings-language-select select { min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; }
 .setting-toggle { display: flex; width: 46px; height: 26px; flex: 0 0 46px; align-items: center; padding: 3px; border: 0; border-radius: 99px; background: #d6d5df; transition: background .18s ease; }
 .setting-toggle span { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0002; transition: transform .18s ease; }
 .setting-toggle-active { background: var(--primary); }
@@ -381,7 +383,21 @@ button { cursor: pointer; }
 .auth-hero p { color: #e6e1ff; font-size: 13px; }
 .auth-art-footer { position: relative; z-index: 1; color: #e6e1ff; font-size: 10px; }
 .auth-panel { display: grid; place-items: center; padding: 35px; }
-.auth-card { width: min(100%, 410px); }
+.auth-card { position: relative; width: min(100%, 410px); }
+.auth-language-toggle { position: absolute; top: -42px; right: 0; display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 700; }
+.auth-language-toggle:hover { border-color: var(--primary); color: var(--primary); }
+.language-menu { position: relative; flex: 0 0 auto; }
+.language-menu > summary { display: inline-flex; height: 38px; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 650; list-style: none; cursor: pointer; transition: .18s ease; }
+.language-menu > summary::-webkit-details-marker { display: none; }
+.language-menu > summary:hover, .language-menu[open] > summary { border-color: #d7d0fb; color: var(--primary); }
+.language-menu > summary > .ph-globe-hemisphere-west { color: var(--muted); font-size: 16px; }
+.language-menu[open] > summary > .language-picker-caret { transform: rotate(180deg); }
+.language-picker-caret { margin-left: 1px; color: var(--muted); font-size: 11px; transition: transform .18s ease; }
+.language-menu-options { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; display: grid; width: 155px; gap: 3px; padding: 5px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.language-menu-options button { display: flex; min-height: 38px; align-items: center; justify-content: space-between; padding: 0 10px; border: 0; border-radius: 8px; color: var(--ink); background: transparent; font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.language-menu-options button:hover, .language-menu-options .language-menu-option-active { color: var(--primary); background: var(--primary-soft); }
+.language-menu-options button:disabled { cursor: wait; opacity: .6; }
+.language-menu-options button > .ph { font-size: 14px; }
 .auth-mobile-brand { display: none; align-items: center; gap: 9px; margin-bottom: 42px; font-size: 18px; font-weight: 750; }
 .auth-heading { margin-bottom: 26px; }
 .auth-heading h2 { margin: 9px 0 6px; font-size: 29px; letter-spacing: -.055em; }
@@ -453,6 +469,8 @@ button { cursor: pointer; }
   .auth-heading h2 { font-size: 25px; }
   .auth-card .form-row { grid-template-columns: 1fr; }
   .topbar-actions .icon-button { width: 34px; height: 34px; flex-basis: 34px; }
+  .language-menu > summary { height: 34px; gap: 6px; padding: 0 8px; font-size: 10px; }
+  .language-menu-options { width: 140px; }
   .stat-card-top { flex-wrap: wrap; }
   .stat-caption { font-size: 9px; }
   .stat-icon { width: 29px; height: 29px; flex-basis: 29px; }

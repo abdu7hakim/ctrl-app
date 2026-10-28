@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { createId } from '../../utils/helpers';
+import { translate } from '../../utils/language';
 
 const colors = ['#7157e8', '#e47070', '#e9a23b', '#39a982', '#4b91d1', '#d35ca3'];
 const weekdayNames = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
@@ -61,7 +62,9 @@ const getCurrentStreak = (completions, today, frequency) => {
   return streak;
 };
 
-function HabitsPage({ habits, onChange }) {
+function HabitsPage({ habits, onChange, language = 'uz' }) {
+  const t = (text) => translate(text, language);
+  const dayLabel = (count) => language === 'en' ? t(count === 1 ? 'kun' : 'kunlar') : 'kun';
   const nameInputRef = useRef(null);
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
@@ -183,7 +186,7 @@ function HabitsPage({ habits, onChange }) {
   return (
     <div className="page-content">
       <div className="habits-layout">
-        <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">BUGUN</span><h3>Odatlarim <span className="heading-count">{doneCount}/{todayHabits.length}</span></h3></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${todayHabits.length ? (doneCount / todayHabits.length) * 100 : 0}%` }}><strong>{todayHabits.length ? Math.round((doneCount / todayHabits.length) * 100) : 0}<small>%</small></strong></span><span>Bugungi natija</span></div></div>
+        <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">{t('BUGUN')}</span><h3>{t('Odatlarim')} <span className="heading-count">{doneCount}/{todayHabits.length}</span></h3></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${todayHabits.length ? (doneCount / todayHabits.length) * 100 : 0}%` }}><strong>{todayHabits.length ? Math.round((doneCount / todayHabits.length) * 100) : 0}<small>%</small></strong></span><span>{t('Bugungi natija')}</span></div></div>
           {habits.length ? <div className="habit-list">{habits.map((habit) => {
             const completed = Boolean(habit.completions?.[today]);
             const habitFrequency = getHabitFrequency(habit);
@@ -222,16 +225,16 @@ function HabitsPage({ habits, onChange }) {
               };
             });
             return <article className={`habit-item ${completed ? 'habit-item-done' : ''}`} key={habit.id} style={{ '--habit-color': habit.color }}>
-              <button className={`todo-check ${completed ? 'todo-check-active' : ''}`} aria-label={completed ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash'} onClick={() => toggleHabit(habit.id)} disabled={saving || !scheduledToday} title={!scheduledToday ? 'Bugun dam olish kuni' : undefined}><i className="ph ph-check" /></button>
+              <button className={`todo-check ${completed ? 'todo-check-active' : ''}`} aria-label={t(completed ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash')} onClick={() => toggleHabit(habit.id)} disabled={saving || !scheduledToday} title={!scheduledToday ? t('Bugun dam olish kuni') : undefined}><i className="ph ph-check" /></button>
               <span className="habit-icon" aria-hidden="true">{habit.icon || '🌱'}</span>
               <div className="todo-item-copy">
-                <div className="habit-title-row"><h3>{habit.name}</h3><span className={`habit-streak ${streak >= 7 ? 'habit-streak-week' : ''}`} aria-label={`${streak} kun davomiylik`}><i className="ph ph-fire" /> {streak} kun</span></div>
-                {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> Odat shakllandi</span>}
+                <div className="habit-title-row"><h3>{habit.name}</h3><span className={`habit-streak ${streak >= 7 ? 'habit-streak-week' : ''}`} aria-label={`${streak} ${t('kun davomiylik')}`}><i className="ph ph-fire" /> {streak} {dayLabel(streak)}</span></div>
+                {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> {t('Odat shakllandi')}</span>}
                 {habit.goal && <p><i className="ph ph-target" /> {habit.goal}</p>}
                 <div className="habit-week">
-                  <span className="habit-week-count">Hafta {habitWeekDone}/{activeWeekDays.length} kun</span>
-                  <div className="habit-week-progress" role="progressbar" aria-label={`${habit.name}: haftalik progress`} aria-valuenow={habitWeekProgress} aria-valuemin="0" aria-valuemax="100"><span style={{ width: `${habitWeekProgress}%` }} /></div>
-                  <div className="habit-week-days" aria-label={`${habit.name}: haftalik natija`}>
+                  <span className="habit-week-count">{t('Hafta')} {habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)}</span>
+                  <div className="habit-week-progress" role="progressbar" aria-label={`${habit.name}: ${t('haftalik progress')}`} aria-valuenow={habitWeekProgress} aria-valuemin="0" aria-valuemax="100"><span style={{ width: `${habitWeekProgress}%` }} /></div>
+                  <div className="habit-week-days" aria-label={`${habit.name}: ${t('haftalik natija')}`}>
                     {weekDays.map((day, index) => {
                       const dayCreated = day.key >= createdDateKey;
                       const dayScheduled = habitFrequency.includes(getWeekdayIndex(day.date));
@@ -239,37 +242,38 @@ function HabitsPage({ habits, onChange }) {
                       const dayCompleted = dayAvailable && Boolean(habit.completions?.[day.key]);
                       const isToday = day.key === today;
                       const dayStatus = !dayCreated
-                        ? 'odat mavjud emas'
+                        ? t('odat mavjud emas')
                         : day.key > today
-                          ? 'kun hali kelmadi'
+                          ? t('kun hali kelmadi')
                           : !dayScheduled
-                            ? 'rejalashtirilmagan kun'
+                            ? t('rejalashtirilmagan kun')
                             : dayCompleted
-                              ? 'bajarildi'
-                              : 'bajarilmadi';
-                      return <span key={day.key} className={`habit-week-day ${dayCompleted ? 'habit-week-day-done' : ''} ${!dayAvailable ? 'habit-week-day-unavailable' : ''} ${isToday ? 'habit-week-day-today' : ''}`} aria-label={`${habit.name}, ${fullWeekdayNames[day.date.getDay()]}${isToday ? ', bugun' : ''}: ${dayStatus}`} title={`${fullWeekdayNames[day.date.getDay()]}: ${dayStatus}`}>{dayCreated && dayScheduled ? weekdayNames[index] : '–'}</span>;
+                              ? t('bajarildi')
+                              : t('bajarilmadi');
+                      const localizedDay = t(fullWeekdayNames[day.date.getDay()]);
+                      return <span key={day.key} className={`habit-week-day ${dayCompleted ? 'habit-week-day-done' : ''} ${!dayAvailable ? 'habit-week-day-unavailable' : ''} ${isToday ? 'habit-week-day-today' : ''}`} aria-label={`${habit.name}, ${localizedDay}${isToday ? `, ${t('bugun')}` : ''}: ${dayStatus}`} title={`${localizedDay}: ${dayStatus}`}>{dayCreated && dayScheduled ? t(weekdayNames[index]) : '–'}</span>;
                     })}
                   </div>
                 </div>
                 <div className="habit-reports">
-                  <p className="habit-report-summary">Bu hafta <strong>{habitWeekDone}/{activeWeekDays.length} kun ({habitWeekProgress}%)</strong>; bu oy <strong>{monthDone}/{monthDays.length} kun ({monthProgress}%)</strong> bajardingiz.</p>
-                  <div className="habit-month-chart" role="img" aria-label={`${habit.name}: oylik hisobot, ${monthDone} kun ${monthDays.length} rejalashtirilgan kundan`}>
+                  <p className="habit-report-summary">{t('Bu hafta')} <strong>{habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)} ({habitWeekProgress}%)</strong>; {t('bu oy')} <strong>{monthDone}/{monthDays.length} {dayLabel(monthDays.length)} ({monthProgress}%)</strong> {t('bajardingiz.')}</p>
+                  <div className="habit-month-chart" role="img" aria-label={`${habit.name}: ${t('oylik hisobot')}, ${monthDone} ${t('kun')} ${monthDays.length} ${t('rejalashtirilgan kundan')}`}>
                     {monthWeeks.map((week) => (
-                      <div className="habit-month-chart-column" key={week.label} title={`${week.label}-kunlar: ${week.done}/${week.total} (${week.progress}%)`}>
+                      <div className="habit-month-chart-column" key={week.label} title={`${week.label} ${t('kunlar:')} ${week.done}/${week.total} (${week.progress}%)`}>
                         <span className="habit-month-chart-track"><span style={{ height: `${week.progress}%` }} /></span>
                         <small>{week.label}</small>
                       </div>
                     ))}
                   </div>
                 </div>
-                {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>Nega boshlagandim?</strong> {habit.reason}</span></p>}
+                {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>{t('Nega boshlagandim?')}</strong> {habit.reason}</span></p>}
               </div>
-              <span className={`habit-status ${completed ? 'habit-status-done' : ''}`}>{completed ? 'Bajarildi' : scheduledToday ? 'Bugun' : 'Dam olish'}</span>
-              <button className="icon-button" aria-label={`${habit.name} odatini tahrirlash`} onClick={() => startEditing(habit)} disabled={saving}><i className="ph ph-pencil-simple" /></button>
-              <button className="icon-button danger-button" aria-label={`${habit.name} odatini o‘chirish`} onClick={() => removeHabit(habit.id)} disabled={saving}><i className="ph ph-trash" /></button>
+              <span className={`habit-status ${completed ? 'habit-status-done' : ''}`}>{t(completed ? 'Bajarildi' : scheduledToday ? 'Bugun' : 'Dam olish')}</span>
+              <button className="icon-button" aria-label={`${habit.name} ${t('odatini tahrirlash')}`} onClick={() => startEditing(habit)} disabled={saving}><i className="ph ph-pencil-simple" /></button>
+              <button className="icon-button danger-button" aria-label={`${habit.name} ${t('odatini o‘chirish')}`} onClick={() => removeHabit(habit.id)} disabled={saving}><i className="ph ph-trash" /></button>
             </article>;
           })}</div> : <div className="habits-empty-state">
-            <svg className="habits-empty-illustration" viewBox="0 0 240 180" role="img" aria-label="O‘sib borayotgan nihol tasviri">
+            <svg className="habits-empty-illustration" viewBox="0 0 240 180" role="img" aria-label={t('O‘sib borayotgan nihol tasviri')}>
               <circle cx="120" cy="87" r="67" fill="var(--primary-soft)" />
               <path d="M75 143h90l-9 13H84z" fill="#d9c8a9" />
               <path d="M90 143c0-23 13-38 30-45 17 7 30 22 30 45z" fill="#b87953" />
@@ -281,22 +285,22 @@ function HabitsPage({ habits, onChange }) {
               <path d="m60 113 4 7 8 1-6 5 1 8-7-4-7 4 2-8-6-5 8-1z" fill="#e9a23b" />
               <path d="m184 60 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#7157e8" />
             </svg>
-            <h4>Hali odatlaringiz yo‘q. Eng kichik qadamdan boshlang!</h4>
-            <p>Bugun boshlagan kichik odatingiz ertangi katta o‘zgarishlarga yo‘l ochadi.</p>
-            <button type="button" className="button button-primary" onClick={() => nameInputRef.current?.focus()}><i className="ph ph-plus" /> Birinchi odatni qo‘shish</button>
+            <h4>{t('Hali odatlaringiz yo‘q. Eng kichik qadamdan boshlang!')}</h4>
+            <p>{t('Bugun boshlagan kichik odatingiz ertangi katta o‘zgarishlarga yo‘l ochadi.')}</p>
+            <button type="button" className="button button-primary" onClick={() => nameInputRef.current?.focus()}><i className="ph ph-plus" /> {t('Birinchi odatni qo‘shish')}</button>
           </div>}
         </section>
-        <aside className="surface-card add-task-card"><span className="eyebrow">{editingId ? 'ODATNI TAHRIRLASH' : 'YANGI ODAT'}</span><h3>{editingId ? 'Odatni yangilang' : 'Yaxshi odat yarating'}</h3><p>Maqsad sari muntazam kichik qadam qo‘ying.</p>
+        <aside className="surface-card add-task-card"><span className="eyebrow">{t(editingId ? 'ODATNI TAHRIRLASH' : 'YANGI ODAT')}</span><h3>{t(editingId ? 'Odatni yangilang' : 'Yaxshi odat yarating')}</h3><p>{t('Maqsad sari muntazam kichik qadam qo‘ying.')}</p>
           <form className="form-stack" onSubmit={editingId ? saveEdit : addHabit}>
-            <label>Odat nomi<input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder="Masalan, ertalab sayr" maxLength="100" required disabled={saving} /></label>
-            <label>Maqsad <span className="optional">(ixtiyoriy)</span><input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="Masalan, 20 daqiqa" maxLength="100" disabled={saving} /></label>
-            <label>Nega men bu odatni qilmoqchiman? <span className="optional">(ixtiyoriy)</span><textarea rows="2" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Masalan, sog‘lom va tetik bo‘lish uchun" maxLength="240" disabled={saving} /></label>
-            <fieldset className="color-field" disabled={saving}><legend>Rang</legend><div className="color-options">{colors.map((option) => <button type="button" key={option} className={`color-option ${color === option ? 'color-option-active' : ''}`} style={{ backgroundColor: option }} aria-label={`${option} rang`} aria-pressed={color === option} onClick={() => setColor(option)} />)}</div></fieldset>
-            <fieldset className="habit-icon-field" disabled={saving}><legend>Ikonka</legend><div className="habit-icon-options">{icons.map((option) => <button type="button" key={option.value} className={`habit-icon-option ${icon === option.value ? 'habit-icon-option-active' : ''}`} aria-label={option.label} aria-pressed={icon === option.value} onClick={() => setIcon(option.value)}>{option.value}</button>)}</div></fieldset>
-            <fieldset className="habit-frequency-field" disabled={saving}><legend>Qaysi kunlari?</legend><div className="habit-frequency-options">{weekdayNames.map((day, index) => <button type="button" key={day} className={`habit-frequency-option ${frequency.includes(index) ? 'habit-frequency-option-active' : ''}`} aria-label={fullWeekdayNames[(index + 1) % 7]} aria-pressed={frequency.includes(index)} onClick={() => toggleFrequency(index)}>{day}</button>)}</div></fieldset>
-            {error && <p className="form-error" role="alert">{error}</p>}
-            {editingId && <button type="button" className="button button-secondary button-wide" onClick={resetForm} disabled={saving}>Bekor qilish</button>}
-            <button className="button button-primary button-wide" disabled={saving}><i className={`ph ${editingId ? 'ph-floppy-disk' : 'ph-plus'}`} /> {saving ? 'Saqlanmoqda...' : editingId ? 'O‘zgarishlarni saqlash' : 'Odat qo‘shish'}</button>
+            <label>{t('Odat nomi')}<input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder={t('Masalan, ertalab sayr')} maxLength="100" required disabled={saving} /></label>
+            <label>{t('Maqsad')} <span className="optional">{t('(ixtiyoriy)')}</span><input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder={t('Masalan, 20 daqiqa')} maxLength="100" disabled={saving} /></label>
+            <label>{t('Nega men bu odatni qilmoqchiman?')} <span className="optional">{t('(ixtiyoriy)')}</span><textarea rows="2" value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t('Masalan, sog‘lom va tetik bo‘lish uchun')} maxLength="240" disabled={saving} /></label>
+            <fieldset className="color-field" disabled={saving}><legend>{t('Rang')}</legend><div className="color-options">{colors.map((option) => <button type="button" key={option} className={`color-option ${color === option ? 'color-option-active' : ''}`} style={{ backgroundColor: option }} aria-label={`${option} ${t('rang')}`} aria-pressed={color === option} onClick={() => setColor(option)} />)}</div></fieldset>
+            <fieldset className="habit-icon-field" disabled={saving}><legend>{t('Ikonka')}</legend><div className="habit-icon-options">{icons.map((option) => <button type="button" key={option.value} className={`habit-icon-option ${icon === option.value ? 'habit-icon-option-active' : ''}`} aria-label={t(option.label)} aria-pressed={icon === option.value} onClick={() => setIcon(option.value)}>{option.value}</button>)}</div></fieldset>
+            <fieldset className="habit-frequency-field" disabled={saving}><legend>{t('Qaysi kunlari?')}</legend><div className="habit-frequency-options">{weekdayNames.map((day, index) => <button type="button" key={day} className={`habit-frequency-option ${frequency.includes(index) ? 'habit-frequency-option-active' : ''}`} aria-label={t(fullWeekdayNames[(index + 1) % 7])} aria-pressed={frequency.includes(index)} onClick={() => toggleFrequency(index)}>{t(day)}</button>)}</div></fieldset>
+            {error && <p className="form-error" role="alert">{t(error)}</p>}
+            {editingId && <button type="button" className="button button-secondary button-wide" onClick={resetForm} disabled={saving}>{t('Bekor qilish')}</button>}
+            <button className="button button-primary button-wide" disabled={saving}><i className={`ph ${editingId ? 'ph-floppy-disk' : 'ph-plus'}`} /> {t(saving ? 'Saqlanmoqda...' : editingId ? 'O‘zgarishlarni saqlash' : 'Odat qo‘shish')}</button>
           </form>
         </aside>
       </div>

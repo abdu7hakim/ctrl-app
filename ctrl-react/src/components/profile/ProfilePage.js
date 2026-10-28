@@ -8,11 +8,13 @@ import {
 import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { createProfileImageDataUrl, profileImageStorageKey } from '../../utils/profileImage';
+import { translate } from '../../utils/language';
 
 const maxProfileImageSize = 5 * 1024 * 1024;
 const allowedProfileImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
-function ProfilePage({ user, onSave }) {
+function ProfilePage({ user, onSave, language = 'uz' }) {
+  const t = (text) => translate(text, language);
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName);
   const [saved, setSaved] = useState(false);
@@ -154,46 +156,46 @@ function ProfilePage({ user, onSave }) {
         <div className="profile-summary">
           <div className="profile-avatar-control">
             {user.photoURL
-              ? <img className="avatar avatar-large profile-avatar-image" src={user.photoURL} alt={`${user.firstName} profil rasmi`} />
+              ? <img className="avatar avatar-large profile-avatar-image" src={user.photoURL} alt={`${user.firstName} ${t('profil rasmi')}`} />
               : <span className="avatar avatar-large">{`${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()}</span>}
             <label className={`profile-avatar-upload ${uploadingImage ? 'profile-avatar-uploading' : ''}`}>
               <i className={`ph ${uploadingImage ? 'ph-spinner' : 'ph-camera'}`} aria-hidden="true" />
-              <span>{uploadingImage ? 'Yuklanmoqda...' : user.photoURL ? 'Rasmni almashtirish' : 'Rasm yuklash'}</span>
+              <span>{t(uploadingImage ? 'Yuklanmoqda...' : user.photoURL ? 'Rasmni almashtirish' : 'Rasm yuklash')}</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                aria-label="Profil rasmini yuklash"
+                aria-label={t('Profil rasmini yuklash')}
                 onChange={uploadProfileImage}
                 disabled={uploadingImage || saving}
               />
             </label>
           </div>
           <div><h3>{user.firstName} {user.lastName}</h3><p>{user.email}</p></div>
-          <span className="account-badge"><i className="ph ph-check-circle" /> Faol hisob</span>
+          <span className="account-badge"><i className="ph ph-check-circle" /> {t('Faol hisob')}</span>
         </div>
         <form className="profile-form" onSubmit={submit}>
-          <div className="form-row"><label>Ism<input value={firstName} onChange={(event) => { setFirstName(event.target.value); setSaved(false); }} required maxLength="60" /></label><label>Familiya<input value={lastName} onChange={(event) => { setLastName(event.target.value); setSaved(false); }} required maxLength="60" /></label></div>
-          <label>E-mail manzil<input value={user.email} type="email" readOnly disabled /></label>
-          <p className="profile-image-note">JPG, PNG yoki WebP · 5 MB gacha</p>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <div className="profile-form-footer">{saved && <span className="success-message" role="status">Saqlandi</span>}<button className="button button-primary" disabled={saving}>{saving ? 'Saqlanmoqda...' : 'O‘zgarishlarni saqlash'}</button></div>
+          <div className="form-row"><label>{t('Ism')}<input value={firstName} onChange={(event) => { setFirstName(event.target.value); setSaved(false); }} required maxLength="60" /></label><label>{t('Familiya')}<input value={lastName} onChange={(event) => { setLastName(event.target.value); setSaved(false); }} required maxLength="60" /></label></div>
+          <label>{t('E-mail manzil')}<input value={user.email} type="email" readOnly disabled /></label>
+          <p className="profile-image-note">{t('JPG, PNG yoki WebP · 5 MB gacha')}</p>
+          {error && <p className="form-error" role="alert">{t(error)}</p>}
+          <div className="profile-form-footer">{saved && <span className="success-message" role="status">{t('Saqlandi')}</span>}<button className="button button-primary" disabled={saving}>{t(saving ? 'Saqlanmoqda...' : 'O‘zgarishlarni saqlash')}</button></div>
         </form>
       </section>
       <section className="profile-security">
         <section className="surface-card profile-security-card">
-          <div className="section-heading"><div><span className="eyebrow">HISOB XAVFSIZLIGI</span><h3>Parolni o‘zgartirish</h3></div></div>
-          <p className="security-description">Hisobingizni himoya qilish uchun joriy parolingizni tasdiqlang.</p>
+          <div className="section-heading"><div><span className="eyebrow">{t('HISOB XAVFSIZLIGI')}</span><h3>{t('Parolni o‘zgartirish')}</h3></div></div>
+          <p className="security-description">{t('Hisobingizni himoya qilish uchun joriy parolingizni tasdiqlang.')}</p>
           <form className="profile-security-form" onSubmit={changePassword}>
-            <label>Joriy parol<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => { setCurrentPassword(event.target.value); setPasswordError(''); }} required disabled={passwordSaving} /></label>
-            <label>Yangi parol<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setPasswordError(''); }} required minLength="6" disabled={passwordSaving} /></label>
-            <label>Yangi parolni tasdiqlang<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordError(''); }} required minLength="6" disabled={passwordSaving} /></label>
-            {passwordError && <p className="form-error" role="alert">{passwordError}</p>}
-            {passwordNotice && <p className="success-message" role="status">{passwordNotice}</p>}
-            <button className="button button-primary" disabled={passwordSaving}>{passwordSaving ? 'Saqlanmoqda...' : 'Yangi parolni saqlash'}</button>
+            <label>{t('Joriy parol')}<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => { setCurrentPassword(event.target.value); setPasswordError(''); }} required disabled={passwordSaving} /></label>
+            <label>{t('Yangi parol')}<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setPasswordError(''); }} required minLength="6" disabled={passwordSaving} /></label>
+            <label>{t('Yangi parolni tasdiqlang')}<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordError(''); }} required minLength="6" disabled={passwordSaving} /></label>
+            {passwordError && <p className="form-error" role="alert">{t(passwordError)}</p>}
+            {passwordNotice && <p className="success-message" role="status">{t(passwordNotice)}</p>}
+            <button className="button button-primary" disabled={passwordSaving}>{t(passwordSaving ? 'Saqlanmoqda...' : 'Yangi parolni saqlash')}</button>
           </form>
         </section>
       </section>
-      <section className="surface-card data-notice"><span className="stat-icon violet"><i className="ph ph-database" /></span><div><h3>Ma’lumotlaringiz xavfsiz</h3><p>Profil ma’lumotlaringiz Firebase hisobingiz va shaxsiy Firestore hujjatingiz bilan bog‘langan.</p></div></section>
+      <section className="surface-card data-notice"><span className="stat-icon violet"><i className="ph ph-database" /></span><div><h3>{t('Ma’lumotlaringiz xavfsiz')}</h3><p>{t('Profil ma’lumotlaringiz Firebase hisobingiz va shaxsiy Firestore hujjatingiz bilan bog‘langan.')}</p></div></section>
     </div>
   );
 }
