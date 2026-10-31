@@ -55,6 +55,36 @@ test('shows an illustrated prompt when there are no habits', () => {
   expect(screen.getByLabelText('Odat nomi')).toHaveFocus();
 });
 
+test('toggles habit details from the card while keeping checkbox actions separate', async () => {
+  const onChange = jest.fn().mockResolvedValue();
+  const habit = {
+    id: 'mobile-habit',
+    name: 'Kitob o‘qish',
+    color: '#7157e8',
+    frequency: [0, 1, 2, 3, 4, 5, 6],
+    completions: {},
+  };
+  const { container } = render(<HabitsPage habits={[habit]} onChange={onChange} />);
+  const card = container.querySelector('.habit-item');
+  const summary = card.querySelector('.habit-summary');
+
+  expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
+    await Promise.resolve();
+  });
+  expect(summary).toHaveAttribute('aria-expanded', 'false');
+  expect(onChange).toHaveBeenCalledWith([
+    expect.objectContaining({ id: 'mobile-habit', completedToday: true }),
+  ]);
+
+  fireEvent.click(summary);
+  expect(summary).toHaveAttribute('aria-expanded', 'true');
+  expect(card).toHaveClass('habit-item-expanded');
+  fireEvent.click(summary);
+  expect(summary).toHaveAttribute('aria-expanded', 'false');
+});
+
 test('creates a habit with a selected icon and selected weekdays', async () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
   const onChange = jest.fn().mockResolvedValue();

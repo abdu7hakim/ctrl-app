@@ -3,6 +3,7 @@ const englishTranslations = {
   'Umumiy': 'Overview',
   'Vazifalar': 'Tasks',
   'Odatlar': 'Habits',
+  'Kun tartibi': 'Daily Routine',
   'Diqqat vaqti': 'Focus',
   'Profil': 'Profile',
   'Aloqa': 'Contact',

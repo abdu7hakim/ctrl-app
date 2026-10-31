@@ -149,6 +149,54 @@ test('dashboard shows the formatted date in its banner without a duplicate heade
   expect(document.querySelector('.topbar-date')).not.toBeInTheDocument();
 });
 
+test('saves daily routine changes to the signed-in user document', async () => {
+  await openPage('Kun tartibi');
+  const today = new Date();
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  fireEvent.change(screen.getByLabelText('Add a new task...'), { target: { value: 'Plan the day' } });
+  fireEvent.submit(screen.getByLabelText('Add a new task...').closest('form'));
+
+  await waitFor(() => expect(updateDoc).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    expect.objectContaining({
+      routine: expect.objectContaining({
+        [todayKey]: expect.arrayContaining([
+          expect.objectContaining({ task: 'Plan the day', category: 'General', done: false }),
+        ]),
+      }),
+      routineBadges: [],
+    }),
+  ));
+});
+
+test('loads saved routine tasks and custom badges from the user document', async () => {
+  const today = new Date();
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({
+      ...storedData,
+      routine: {
+        [todayKey]: [{ id: 'saved-task', time: '08:00', task: 'Saved from Firebase', category: 'Learning', done: true }],
+      },
+      routineBadges: [{ name: 'Learning', color: 'indigo' }],
+    }),
+  });
+  await openPage('Kun tartibi');
+
+  expect(screen.getByText('Saved from Firebase')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mark incomplete: Saved from Firebase' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('Learning', { selector: '.routine-badge' })).toHaveClass('routine-badge-indigo');
+});
+
 test('todo creation, completion, and deletion are persisted to the signed-in user document', async () => {
   await openPage('Vazifalar');
   expect(screen.getAllByRole('heading', { name: 'Vazifalar' })).toHaveLength(1);

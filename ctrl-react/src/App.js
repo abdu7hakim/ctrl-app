@@ -4,6 +4,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import OverviewPage from './components/dashboard/OverviewPage';
 import TodoPage from './components/todo/TodoPage';
 import HabitsPage from './components/habits/HabitsPage';
+import RoutinePage from './components/routine/RoutinePage';
 import FocusPage from './components/focus/FocusPage';
 import ProfilePage from './components/profile/ProfilePage';
 import ContactPage from './components/contact/ContactPage';
@@ -20,6 +21,8 @@ import './App.css';
 const initialData = {
   todos: [],
   habits: [],
+  routine: {},
+  routineBadges: [],
   focusSessions: 0,
   focusMinutes: 0,
   darkMode: false,
@@ -135,6 +138,10 @@ function App() {
             ...storedData,
             todos: Array.isArray(storedData.todos) ? storedData.todos : [],
             habits: Array.isArray(storedData.habits) ? storedData.habits : [],
+            routine: storedData.routine && typeof storedData.routine === 'object' && !Array.isArray(storedData.routine)
+              ? storedData.routine
+              : {},
+            routineBadges: Array.isArray(storedData.routineBadges) ? storedData.routineBadges : [],
             darkMode: typeof storedData.darkMode === 'boolean' ? storedData.darkMode : false,
             colorTheme: getColorTheme(storedData.colorTheme).id,
             photoURL: localPhotoURL,
@@ -284,6 +291,17 @@ function App() {
     }
     await updateDoc(doc(db, 'users', user.uid), { [field]: value });
     setData((current) => ({ ...current, [field]: value }));
+  };
+
+  const saveRoutine = async ({ routine, routineBadges }) => {
+    if (!user || auth.currentUser?.uid !== user.uid) {
+      throw new Error('Routine’ni saqlash uchun hisobingizga kiring.');
+    }
+    if (!routine || typeof routine !== 'object' || Array.isArray(routine) || !Array.isArray(routineBadges)) {
+      throw new Error('Routine ma’lumotlari noto‘g‘ri formatda.');
+    }
+    await updateDoc(doc(db, 'users', user.uid), { routine, routineBadges });
+    setData((current) => ({ ...current, routine, routineBadges }));
   };
 
   const saveFocusSession = async (minutes, todoId = null) => {
@@ -441,6 +459,7 @@ function App() {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} language={language} />,
     todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} language={language} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} language={language} />,
+    routine: <RoutinePage routines={data.routine} routineBadges={data.routineBadges} onSave={saveRoutine} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
       setNotice('Profil ma’lumotlari saqlandi.');

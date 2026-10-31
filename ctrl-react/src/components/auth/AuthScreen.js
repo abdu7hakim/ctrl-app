@@ -42,6 +42,8 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
           email: userCredential.user.email,
           todos: [],
           habits: [],
+          routine: {},
+          routineBadges: [],
           focusSessions: 0,
           focusMinutes: 0,
           darkMode: false,

@@ -73,6 +73,7 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
   const [icon, setIcon] = useState('🌱');
   const [frequency, setFrequency] = useState(allWeekdays);
   const [editingId, setEditingId] = useState(null);
+  const [expandedHabitId, setExpandedHabitId] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const currentDate = new Date();
@@ -182,6 +183,7 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
   }));
 
   const removeHabit = (id) => saveHabits(habits.filter((habit) => habit.id !== id));
+  const toggleHabitDetails = (id) => setExpandedHabitId((current) => (current === id ? null : id));
 
   return (
     <div className="page-content">
@@ -224,53 +226,69 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
                 total: days.length,
               };
             });
-            return <article className={`habit-item ${completed ? 'habit-item-done' : ''}`} key={habit.id} style={{ '--habit-color': habit.color }}>
-              <button className={`todo-check ${completed ? 'todo-check-active' : ''}`} aria-label={t(completed ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash')} onClick={() => toggleHabit(habit.id)} disabled={saving || !scheduledToday} title={!scheduledToday ? t('Bugun dam olish kuni') : undefined}><i className="ph ph-check" /></button>
-              <span className="habit-icon" aria-hidden="true">{habit.icon || '🌱'}</span>
+            const expanded = expandedHabitId === habit.id;
+            return <article
+              className={`habit-item ${completed ? 'habit-item-done' : ''} ${expanded ? 'habit-item-expanded' : ''}`}
+              key={habit.id}
+              style={{ '--habit-color': habit.color }}
+            >
+              <button className={`todo-check habit-check ${completed ? 'todo-check-active' : ''}`} aria-label={t(completed ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash')} onClick={() => toggleHabit(habit.id)} disabled={saving || !scheduledToday} title={!scheduledToday ? t('Bugun dam olish kuni') : undefined}><i className="ph ph-check" /></button>
               <div className="todo-item-copy">
-                <div className="habit-title-row"><h3>{habit.name}</h3><span className={`habit-streak ${streak >= 7 ? 'habit-streak-week' : ''}`} aria-label={`${streak} ${t('kun davomiylik')}`}><i className="ph ph-fire" /> {streak} {dayLabel(streak)}</span></div>
-                {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> {t('Odat shakllandi')}</span>}
-                {habit.goal && <p><i className="ph ph-target" /> {habit.goal}</p>}
-                <div className="habit-week">
-                  <span className="habit-week-count">{t('Hafta')} {habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)}</span>
-                  <div className="habit-week-progress" role="progressbar" aria-label={`${habit.name}: ${t('haftalik progress')}`} aria-valuenow={habitWeekProgress} aria-valuemin="0" aria-valuemax="100"><span style={{ width: `${habitWeekProgress}%` }} /></div>
-                  <div className="habit-week-days" aria-label={`${habit.name}: ${t('haftalik natija')}`}>
-                    {weekDays.map((day, index) => {
-                      const dayCreated = day.key >= createdDateKey;
-                      const dayScheduled = habitFrequency.includes(getWeekdayIndex(day.date));
-                      const dayAvailable = dayCreated && day.key <= today && dayScheduled;
-                      const dayCompleted = dayAvailable && Boolean(habit.completions?.[day.key]);
-                      const isToday = day.key === today;
-                      const dayStatus = !dayCreated
-                        ? t('odat mavjud emas')
-                        : day.key > today
-                          ? t('kun hali kelmadi')
-                          : !dayScheduled
-                            ? t('rejalashtirilmagan kun')
-                            : dayCompleted
-                              ? t('bajarildi')
-                              : t('bajarilmadi');
-                      const localizedDay = t(fullWeekdayNames[day.date.getDay()]);
-                      return <span key={day.key} className={`habit-week-day ${dayCompleted ? 'habit-week-day-done' : ''} ${!dayAvailable ? 'habit-week-day-unavailable' : ''} ${isToday ? 'habit-week-day-today' : ''}`} aria-label={`${habit.name}, ${localizedDay}${isToday ? `, ${t('bugun')}` : ''}: ${dayStatus}`} title={`${localizedDay}: ${dayStatus}`}>{dayCreated && dayScheduled ? t(weekdayNames[index]) : '–'}</span>;
-                    })}
+                <button type="button" className="habit-summary" aria-expanded={expanded} onClick={() => toggleHabitDetails(habit.id)}>
+                  <span className="habit-icon" aria-hidden="true">{habit.icon || '🌱'}</span>
+                  <span className="habit-summary-copy">
+                    <span className="habit-title-row">
+                      <span className="habit-name">{habit.name}</span>
+                      <span className={`habit-streak ${streak >= 7 ? 'habit-streak-week' : ''}`} aria-label={`${streak} ${t('kun davomiylik')}`}><i className="ph ph-fire" /> {streak} {dayLabel(streak)}</span>
+                    </span>
+                  </span>
+                </button>
+                <div className="habit-details">
+                  {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> {t('Odat shakllandi')}</span>}
+                  {habit.goal && <p><i className="ph ph-target" /> {habit.goal}</p>}
+                  <div className="habit-week">
+                    <span className="habit-week-count">{t('Hafta')} {habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)}</span>
+                    <div className="habit-week-progress" role="progressbar" aria-label={`${habit.name}: ${t('haftalik progress')}`} aria-valuenow={habitWeekProgress} aria-valuemin="0" aria-valuemax="100"><span style={{ width: `${habitWeekProgress}%` }} /></div>
+                    <div className="habit-week-days" aria-label={`${habit.name}: ${t('haftalik natija')}`}>
+                      {weekDays.map((day, index) => {
+                        const dayCreated = day.key >= createdDateKey;
+                        const dayScheduled = habitFrequency.includes(getWeekdayIndex(day.date));
+                        const dayAvailable = dayCreated && day.key <= today && dayScheduled;
+                        const dayCompleted = dayAvailable && Boolean(habit.completions?.[day.key]);
+                        const isToday = day.key === today;
+                        const dayStatus = !dayCreated
+                          ? t('odat mavjud emas')
+                          : day.key > today
+                            ? t('kun hali kelmadi')
+                            : !dayScheduled
+                              ? t('rejalashtirilmagan kun')
+                              : dayCompleted
+                                ? t('bajarildi')
+                                : t('bajarilmadi');
+                        const localizedDay = t(fullWeekdayNames[day.date.getDay()]);
+                        return <span key={day.key} className={`habit-week-day ${dayCompleted ? 'habit-week-day-done' : ''} ${!dayAvailable ? 'habit-week-day-unavailable' : ''} ${isToday ? 'habit-week-day-today' : ''}`} aria-label={`${habit.name}, ${localizedDay}${isToday ? `, ${t('bugun')}` : ''}: ${dayStatus}`} title={`${localizedDay}: ${dayStatus}`}>{dayCreated && dayScheduled ? t(weekdayNames[index]) : '–'}</span>;
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div className="habit-reports">
-                  <p className="habit-report-summary">{t('Bu hafta')} <strong>{habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)} ({habitWeekProgress}%)</strong>; {t('bu oy')} <strong>{monthDone}/{monthDays.length} {dayLabel(monthDays.length)} ({monthProgress}%)</strong> {t('bajardingiz.')}</p>
-                  <div className="habit-month-chart" role="img" aria-label={`${habit.name}: ${t('oylik hisobot')}, ${monthDone} ${t('kun')} ${monthDays.length} ${t('rejalashtirilgan kundan')}`}>
-                    {monthWeeks.map((week) => (
-                      <div className="habit-month-chart-column" key={week.label} title={`${week.label} ${t('kunlar:')} ${week.done}/${week.total} (${week.progress}%)`}>
-                        <span className="habit-month-chart-track"><span style={{ height: `${week.progress}%` }} /></span>
-                        <small>{week.label}</small>
-                      </div>
-                    ))}
+                  <div className="habit-reports">
+                    <p className="habit-report-summary">{t('Bu hafta')} <strong>{habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)} ({habitWeekProgress}%)</strong>; {t('bu oy')} <strong>{monthDone}/{monthDays.length} {dayLabel(monthDays.length)} ({monthProgress}%)</strong> {t('bajardingiz.')}</p>
+                    <div className="habit-month-chart" role="img" aria-label={`${habit.name}: ${t('oylik hisobot')}, ${monthDone} ${t('kun')} ${monthDays.length} ${t('rejalashtirilgan kundan')}`}>
+                      {monthWeeks.map((week) => (
+                        <div className="habit-month-chart-column" key={week.label} title={`${week.label} ${t('kunlar:')} ${week.done}/${week.total} (${week.progress}%)`}>
+                          <span className="habit-month-chart-track"><span style={{ height: `${week.progress}%` }} /></span>
+                          <small>{week.label}</small>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                  {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>{t('Nega boshlagandim?')}</strong> {habit.reason}</span></p>}
                 </div>
-                {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>{t('Nega boshlagandim?')}</strong> {habit.reason}</span></p>}
               </div>
-              <span className={`habit-status ${completed ? 'habit-status-done' : ''}`}>{t(completed ? 'Bajarildi' : scheduledToday ? 'Bugun' : 'Dam olish')}</span>
-              <button className="icon-button" aria-label={`${habit.name} ${t('odatini tahrirlash')}`} onClick={() => startEditing(habit)} disabled={saving}><i className="ph ph-pencil-simple" /></button>
-              <button className="icon-button danger-button" aria-label={`${habit.name} ${t('odatini o‘chirish')}`} onClick={() => removeHabit(habit.id)} disabled={saving}><i className="ph ph-trash" /></button>
+              <div className="habit-actions">
+                <span className={`habit-status ${completed ? 'habit-status-done' : ''}`}>{t(completed ? 'Bajarildi' : scheduledToday ? 'Bugun' : 'Dam olish')}</span>
+                <button className="icon-button" aria-label={`${habit.name} ${t('odatini tahrirlash')}`} onClick={() => startEditing(habit)} disabled={saving}><i className="ph ph-pencil-simple" /></button>
+                <button className="icon-button danger-button" aria-label={`${habit.name} ${t('odatini o‘chirish')}`} onClick={() => removeHabit(habit.id)} disabled={saving}><i className="ph ph-trash" /></button>
+              </div>
             </article>;
           })}</div> : <div className="habits-empty-state">
             <svg className="habits-empty-illustration" viewBox="0 0 240 180" role="img" aria-label={t('O‘sib borayotgan nihol tasviri')}>
