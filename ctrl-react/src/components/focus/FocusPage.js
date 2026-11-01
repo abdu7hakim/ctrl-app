@@ -126,7 +126,7 @@ function FocusPage({
       setCompletedPending(true);
       setCompletedMinutes(duration);
       setCompletedTaskId(taskId);
-      setError(saveError.message || 'Sessiyani saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Sessiyani saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setSaving(false);
     }
@@ -231,7 +231,7 @@ function FocusPage({
       setRemaining((mode === 'focus' ? focusDuration : breakDuration) * 60);
     } catch (saveError) {
       console.error('Pomodoro sozlamalarini saqlashda xatolik:', saveError);
-      setError(saveError.message || 'Pomodoro sozlamalarini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Pomodoro sozlamalarini saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setPreferencesSaving(false);
     }

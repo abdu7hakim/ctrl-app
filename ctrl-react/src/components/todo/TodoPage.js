@@ -61,7 +61,7 @@ function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
       return true;
     } catch (saveError) {
       console.error('Vazifalarni saqlashda xatolik:', saveError);
-      setError(saveError.message || 'Vazifalarni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Vazifalarni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
       return false;
     } finally {
       setSaving(false);
@@ -84,7 +84,14 @@ function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
     if (saved) setForm({ title: '', description: '', dueDate: '', priority: 'medium' });
   };
 
-  const toggleTodo = (id) => saveTodos(todos.map((todo) => todo.id === id ? { ...todo, status: todo.status === 'done' ? 'open' : 'done' } : todo));
+  const toggleTodo = (id) => saveTodos(todos.map((todo) => {
+    if (todo.id !== id) return todo;
+    if (todo.status === 'done') {
+      const { completedAt, ...reopenedTodo } = todo;
+      return { ...reopenedTodo, status: 'open' };
+    }
+    return { ...todo, status: 'done', completedAt: getDateKey(new Date()) };
+  }));
   const removeTodo = (id) => saveTodos(todos.filter((todo) => todo.id !== id));
   const startEditing = (todo) => {
     setError('');
@@ -142,7 +149,7 @@ function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
                   <textarea aria-label={t('Izohni tahrirlash')} value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} maxLength="500" rows="2" disabled={saving} />
                   <input aria-label={t('Muddatni tahrirlash')} type="date" value={editForm.dueDate} onChange={(event) => setEditForm({ ...editForm, dueDate: event.target.value })} disabled={saving} />
                   {renderQuickDueDates(setEditForm, editForm.dueDate, saving)}
-                  <select aria-label="Muhimlik darajasini tahrirlash" value={editForm.priority} onChange={(event) => setEditForm({ ...editForm, priority: event.target.value })} disabled={saving}>
+                  <select aria-label={t('Muhimlik darajasini tahrirlash')} value={editForm.priority} onChange={(event) => setEditForm({ ...editForm, priority: event.target.value })} disabled={saving}>
                     {translatedPriorities.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
                   </select>
                 </div>

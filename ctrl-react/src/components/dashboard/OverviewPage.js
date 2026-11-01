@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getDailyMotivation } from '../../utils/motivation';
 import { translate } from '../../utils/language';
+import { getActivityHeatmap } from '../../utils/activityHeatmap';
 
 function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
   const t = (text) => translate(text, language);
@@ -8,6 +9,7 @@ function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
   const today = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(currentDate);
   const progress = data.habits.length ? Math.round((stats.completedHabits / data.habits.length) * 100) : 0;
   const nextTodos = data.todos.filter((todo) => todo.status === 'open').slice(0, 4);
+  const activityHeatmap = getActivityHeatmap(data, currentDate);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -46,10 +48,43 @@ function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
         </div>
       </section>
       <section className="stat-grid" aria-label={t('Bugungi statistika')}>
-        <article className="stat-card"><div className="stat-card-top"><span className="stat-icon violet"><i className="ph ph-check-circle" /></span><span className="stat-caption">{t('Vazifalar')}</span></div><strong>{stats.done}<small> / {data.todos.length}</small></strong><p>{t('Bajarilgan vazifalar')}</p></article>
-        <article className="stat-card"><div className="stat-card-top"><span className="stat-icon green"><i className="ph ph-leaf" /></span><span className="stat-caption">{t('Odatlar')}</span></div><strong>{progress}<small>%</small></strong><p>{stats.completedHabits} {t('ta odat bajarildi')}</p></article>
-        <article className="stat-card"><div className="stat-card-top"><span className="stat-icon orange"><i className="ph ph-timer" /></span><span className="stat-caption">{t('Diqqat vaqti')}</span></div><strong>{stats.focusMinutes}<small> {t('daq')}</small></strong><p>{data.focusSessions} {t('ta fokus sessiyasi')}</p></article>
-        <article className="stat-card"><div className="stat-card-top"><span className="stat-icon blue"><i className="ph ph-list-checks" /></span><span className="stat-caption">{t('Kutilmoqda')}</span></div><strong>{stats.pending}</strong><p>{t('Ochiq vazifalar')}</p></article>
+        <button className="stat-card stat-card-link" type="button" aria-label={t('Vazifalar sahifasini ochish')} onClick={() => onNavigate('todo')}><span className="stat-card-top"><span className="stat-icon violet"><i className="ph ph-check-circle" /></span><span className="stat-caption">{t('Vazifalar')}</span></span><strong>{stats.done}<small> / {data.todos.length}</small></strong><span className="stat-card-description">{t('Bajarilgan vazifalar')}</span></button>
+        <button className="stat-card stat-card-link" type="button" aria-label={t('Odatlar sahifasini ochish')} onClick={() => onNavigate('habits')}><span className="stat-card-top"><span className="stat-icon green"><i className="ph ph-leaf" /></span><span className="stat-caption">{t('Odatlar')}</span></span><strong>{progress}<small>%</small></strong><span className="stat-card-description">{stats.completedHabits} {t('ta odat bajarildi')}</span></button>
+        <button className="stat-card stat-card-link" type="button" aria-label={t('Diqqat vaqti sahifasini ochish')} onClick={() => onNavigate('focus')}><span className="stat-card-top"><span className="stat-icon orange"><i className="ph ph-timer" /></span><span className="stat-caption">{t('Diqqat vaqti')}</span></span><strong>{stats.focusMinutes}<small> {t('daq')}</small></strong><span className="stat-card-description">{data.focusSessions} {t('ta fokus sessiyasi')}</span></button>
+        <button className="stat-card stat-card-link" type="button" aria-label={t('Ochiq vazifalar sahifasini ochish')} onClick={() => onNavigate('todo')}><span className="stat-card-top"><span className="stat-icon blue"><i className="ph ph-list-checks" /></span><span className="stat-caption">{t('Kutilmoqda')}</span></span><strong>{stats.pending}</strong><span className="stat-card-description">{t('Ochiq vazifalar')}</span></button>
+      </section>
+      <section className="surface-card activity-card" aria-labelledby="activity-heading">
+        <div className="activity-heading">
+          <div><span className="eyebrow">{t('IZCHILLIK')}</span><h3 id="activity-heading">{t('Faollik')}</h3></div>
+          <span className="activity-period">{t('Oxirgi 6 oy')}</span>
+        </div>
+        <div className="activity-chart" role="group" aria-label={t('Oxirgi olti oydagi kundalik faollik xaritasi')}>
+          <div className="activity-months" aria-hidden="true">
+            {activityHeatmap.months.map((month) => (
+              <span key={`${month.label}-${month.week}`} style={{ gridColumn: month.week + 1 }}>{t(month.label)}</span>
+            ))}
+          </div>
+          <div className="activity-cells" role="list" aria-label={t('Kunlik faollik')}>
+            {activityHeatmap.cells.map((cell) => {
+              const date = new Date(`${cell.date}T12:00:00`);
+              const label = cell.count
+                ? `${cell.count} ${t('ta bajarilgan ish')} · ${date.toLocaleDateString(language === 'en' ? 'en-US' : 'uz-UZ', { dateStyle: 'long' })}`
+                : `${t('Faollik yo‘q')} · ${date.toLocaleDateString(language === 'en' ? 'en-US' : 'uz-UZ', { dateStyle: 'long' })}`;
+              return <span
+                className={`activity-cell activity-level-${cell.level} ${cell.future ? 'activity-cell-future' : ''}`}
+                key={cell.date}
+                title={label}
+                aria-label={label}
+                role="listitem"
+              />;
+            })}
+          </div>
+          <div className="activity-legend" aria-hidden="true">
+            <span>{t('Kam')}</span>
+            {[0, 1, 2, 3].map((level) => <i className={`activity-cell activity-level-${level}`} key={level} />)}
+            <span>{t('Ko‘p')}</span>
+          </div>
+        </div>
       </section>
       <aside className="daily-motivation">
         <span className="tip-icon"><i className="ph ph-sparkle" aria-hidden="true" /></span>
@@ -64,14 +99,6 @@ function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
           <span className="eyebrow">{t('DIQQATNI JAMLANG')}</span><span className="promo-icon"><i className="ph ph-hourglass-medium" /></span><h3>{t('Bir vazifa.')}<br />{t('To‘liq diqqat.')}</h3><p>{t('Qisqa fokus sessiyasini boshlang va unumdorligingizni oshiring.')}</p><button className="button button-primary" onClick={() => onNavigate('focus')}>{t('Fokusni boshlash')} <i className="ph ph-arrow-right" /></button>
         </section>
       </div>
-      <section className="surface-card quick-actions">
-        <div className="section-heading"><div><span className="eyebrow">{t('TEZKOR KIRISH')}</span><h3>{t('Qayerdan boshlaymiz?')}</h3></div></div>
-        <div className="quick-action-grid">
-          <button onClick={() => onNavigate('todo')}><i className="ph ph-plus-circle" /><span><strong>{t('Vazifa qo‘shish')}</strong><small>{t('Rejangizni tartiblang')}</small></span><i className="ph ph-arrow-up-right" /></button>
-          <button onClick={() => onNavigate('habits')}><i className="ph ph-plant" /><span><strong>{t('Odatlarni kuzatish')}</strong><small>{t('Yaxshi odat yarating')}</small></span><i className="ph ph-arrow-up-right" /></button>
-          <button onClick={() => onNavigate('profile')}><i className="ph ph-user-circle" /><span><strong>{t('Profil sozlamalari')}</strong><small>{t('Hisobingizni boshqaring')}</small></span><i className="ph ph-arrow-up-right" /></button>
-        </div>
-      </section>
     </div>
   );
 }

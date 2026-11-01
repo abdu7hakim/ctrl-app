@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { addDoc, collection, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import {
@@ -7,10 +8,11 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
+import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import AuthScreen from './components/auth/AuthScreen';
 import App from './App';
 import TodoPage from './components/todo/TodoPage';
-import { createProfileImageDataUrl } from './utils/profileImage';
+import { createProfileImageDataUrl, profileImageStorageKey } from './utils/profileImage';
 import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
 import { colorThemes } from './utils/themes';
 import { getTodoDeadline, isTodoOverdue, isTodoUrgent } from './utils/todoDeadlines';
@@ -51,6 +53,13 @@ jest.mock('firebase/firestore', () => ({
   updateDoc: jest.fn().mockResolvedValue(),
 }));
 
+jest.mock('firebase/storage', () => ({
+  deleteObject: jest.fn().mockResolvedValue(),
+  getDownloadURL: jest.fn().mockResolvedValue('https://storage.example.com/profile.jpg'),
+  ref: jest.fn((_storage, path) => ({ path })),
+  uploadString: jest.fn().mockImplementation((photoRef) => Promise.resolve({ ref: photoRef })),
+}));
+
 import { onAuthStateChanged } from 'firebase/auth';
 
 const storedData = {
@@ -76,6 +85,10 @@ beforeEach(() => {
   increment.mockImplementation((amount) => ({ increment: amount }));
   serverTimestamp.mockReturnValue('server-timestamp');
   updateDoc.mockResolvedValue();
+  deleteObject.mockResolvedValue();
+  getDownloadURL.mockResolvedValue('https://storage.example.com/profile.jpg');
+  ref.mockImplementation((_storage, path) => ({ path }));
+  uploadString.mockImplementation((photoRef) => Promise.resolve({ ref: photoRef }));
   createProfileImageDataUrl.mockResolvedValue('data:image/jpeg;base64,local-avatar');
   reauthenticateWithCredential.mockResolvedValue();
   updatePassword.mockResolvedValue();
@@ -141,6 +154,23 @@ test('sign-up writes the profile and default app data to the new user document',
   });
 });
 
+test('auth mode switch swaps the panels without submitting or reloading', async () => {
+  render(<AuthScreen />);
+
+  expect(screen.getByRole('heading', { name: 'Hisob yarating' })).toBeInTheDocument();
+  expect(document.querySelector('.auth-page')).not.toHaveClass('auth-page-login');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Kirish' }));
+
+  expect(await screen.findByRole('heading', { name: 'Hisobingizga kiring' })).toBeInTheDocument();
+  expect(document.querySelector('.auth-page')).toHaveClass('auth-page-login');
+  expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ro‘yxatdan o‘tish' }));
+  expect(await screen.findByRole('heading', { name: 'Hisob yarating' })).toBeInTheDocument();
+  expect(document.querySelector('.auth-page')).not.toHaveClass('auth-page-login');
+});
+
 test('dashboard shows the formatted date in its banner without a duplicate header date', async () => {
   render(<App />);
   await screen.findByRole('navigation', { name: 'Asosiy menyu' });
@@ -157,8 +187,8 @@ test('saves daily routine changes to the signed-in user document', async () => {
     String(today.getMonth() + 1).padStart(2, '0'),
     String(today.getDate()).padStart(2, '0'),
   ].join('-');
-  fireEvent.change(screen.getByLabelText('Add a new task...'), { target: { value: 'Plan the day' } });
-  fireEvent.submit(screen.getByLabelText('Add a new task...').closest('form'));
+  fireEvent.change(screen.getByLabelText('Yangi vazifa qo‘shish...'), { target: { value: 'Plan the day' } });
+  fireEvent.submit(screen.getByLabelText('Yangi vazifa qo‘shish...').closest('form'));
 
   await waitFor(() => expect(updateDoc).toHaveBeenCalledWith(
     { name: 'users', id: 'user-1' },
@@ -193,7 +223,7 @@ test('loads saved routine tasks and custom badges from the user document', async
   await openPage('Kun tartibi');
 
   expect(screen.getByText('Saved from Firebase')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Mark incomplete: Saved from Firebase' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Bajarilmagan deb belgilash: Saved from Firebase' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('Learning', { selector: '.routine-badge' })).toHaveClass('routine-badge-indigo');
 });
 
@@ -219,12 +249,48 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
   expect(await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' })).toBeInTheDocument();
   expect(updateDoc).toHaveBeenLastCalledWith(
     expect.anything(),
-    expect.objectContaining({ todos: expect.arrayContaining([expect.objectContaining({ status: 'done' })]) }),
+    expect.objectContaining({ todos: expect.arrayContaining([expect.objectContaining({
+      status: 'done',
+      completedAt: (() => {
+        const today = new Date();
+        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      })(),
+    })]) }),
   );
-
   fireEvent.click(screen.getByRole('button', { name: 'React ilovasini o‘rganish vazifasini o‘chirish' }));
   expect(await screen.findByText('Bu ro‘yxatda hali vazifa yo‘q.')).toBeInTheDocument();
 }, 10000);
+
+test('todo completion activity date is cleared when a task is reopened', async () => {
+  const onChange = jest.fn().mockResolvedValue();
+  const TodoPageHarness = () => {
+    const [todos, setTodos] = useState([{ id: 'todo-1', title: 'Complete report', status: 'open' }]);
+    return <TodoPage todos={todos} onChange={async (nextTodos) => {
+      await onChange(nextTodos);
+      setTodos(nextTodos);
+    }} />;
+  };
+  render(<TodoPageHarness />);
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
+    await Promise.resolve();
+  });
+  expect(onChange).toHaveBeenLastCalledWith([
+    expect.objectContaining({ status: 'done', completedAt: todayKey }),
+  ]);
+  const reopenButton = await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' });
+  await act(async () => {
+    fireEvent.click(reopenButton);
+    await Promise.resolve();
+  });
+  await waitFor(() => expect(onChange).toHaveBeenCalledTimes(2));
+  const reopenedTodo = onChange.mock.calls[1][0][0];
+  expect(reopenedTodo.status).toBe('open');
+  expect(reopenedTodo).not.toHaveProperty('completedAt');
+});
 
 test('todo quick dates and priority are saved with the task', async () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
@@ -373,7 +439,7 @@ test('password change reauthenticates and validates password confirmation', asyn
   expect(updatePassword).toHaveBeenCalledTimes(1);
 });
 
-test('profile image upload saves a resized image locally without writing it to Firebase', async () => {
+test('profile image upload saves a resized image to Firebase Storage and the user document', async () => {
   await openPage('Profil');
   const uploadInput = screen.getByLabelText('Profil rasmini yuklash');
   const image = new File(['profile image'], 'profile.png', { type: 'image/png' });
@@ -381,23 +447,40 @@ test('profile image upload saves a resized image locally without writing it to F
 
   expect(await screen.findByAltText('Aziza profil rasmi')).toBeInTheDocument();
   expect(createProfileImageDataUrl).toHaveBeenCalledWith(image);
-  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBe('data:image/jpeg;base64,local-avatar');
-  expect(updateProfile).not.toHaveBeenCalledWith(expect.anything(), { photoURL: expect.anything() });
-  expect(updateDoc).not.toHaveBeenCalledWith(expect.anything(), { photoURL: expect.anything() });
+  expect(uploadString).toHaveBeenCalledWith(
+    expect.objectContaining({ path: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/) }),
+    'data:image/jpeg;base64,local-avatar',
+    'data_url',
+  );
+  expect(getDownloadURL).toHaveBeenCalled();
+  expect(updateDoc).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    expect.objectContaining({
+      photoURL: 'https://storage.example.com/profile.jpg',
+      photoPath: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/),
+    }),
+  );
+  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBeNull();
 });
 
-test('profile image is restored from local storage after loading the account', async () => {
+test('existing local profile images are migrated to Firebase when loading the account', async () => {
   window.localStorage.setItem('ctrl-profile-image-user-1', 'data:image/jpeg;base64,saved-avatar');
 
   await openPage('Profil');
 
   expect(await screen.findByAltText('Aziza profil rasmi')).toHaveAttribute(
     'src',
-    'data:image/jpeg;base64,saved-avatar',
+    'https://storage.example.com/profile.jpg',
   );
+  expect(uploadString).toHaveBeenCalledWith(
+    expect.objectContaining({ path: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/) }),
+    'data:image/jpeg;base64,saved-avatar',
+    'data_url',
+  );
+  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBeNull();
 });
 
-test('profile image does not fall back to a Firebase photo URL when no local image exists', async () => {
+test('profile image is restored from Firebase when no local image exists', async () => {
   getDoc.mockResolvedValue({
     exists: () => true,
     data: () => ({ ...storedData, photoURL: 'https://storage.example.com/previous-avatar' }),
@@ -414,8 +497,10 @@ test('profile image does not fall back to a Firebase photo URL when no local ima
 
   await openPage('Profil');
 
-  expect(screen.queryByAltText('Aziza profil rasmi')).not.toBeInTheDocument();
-  expect(screen.getAllByText('AA').length).toBeGreaterThan(0);
+  expect(await screen.findByAltText('Aziza profil rasmi')).toHaveAttribute(
+    'src',
+    'https://storage.example.com/previous-avatar',
+  );
 });
 
 test('profile image upload rejects unsupported image types', async () => {
@@ -481,6 +566,57 @@ test('settings page applies and saves a selected color theme', async () => {
 
   fireEvent.click(screen.getByRole('switch', { name: 'Tungi rejim' }));
   await waitFor(() => expect(document.documentElement.style.getPropertyValue('--primary')).toBe('#82b4ff'));
+});
+
+test('settings reset requires confirmation and only keeps account identity fields', async () => {
+  window.localStorage.setItem('ctrl-app-language', 'en');
+  window.localStorage.setItem(profileImageStorageKey('user-1'), 'data:image/jpeg;base64,avatar');
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({
+      ...storedData,
+      photoURL: 'https://storage.example.com/avatar.jpg',
+      photoPath: 'users/user-1/profile/avatar.jpg',
+    }),
+  });
+  render(<App />);
+  await screen.findByRole('navigation', { name: 'Main menu' });
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete my data' }));
+  expect(screen.getByText('This cannot be undone. Are you sure?')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(setDoc).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Delete my data' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, delete all my data' }));
+  await waitFor(() => expect(setDoc).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    { firstName: 'Aziza', lastName: 'Aliyeva', email: 'aziza@example.com' },
+  ));
+  expect(deleteObject).toHaveBeenCalledWith({ path: 'users/user-1/profile/avatar.jpg' });
+  expect(await screen.findByText('Ma’lumotlaringiz o‘chirildi. Ism, familiya, email va parolingiz saqlab qolindi.', {
+    selector: '.settings-reset-success',
+  })).toBeInTheDocument();
+  expect(window.localStorage.getItem('ctrl-app-language')).toBeNull();
+  expect(window.localStorage.getItem(profileImageStorageKey('user-1'))).toBeNull();
+  expect(document.documentElement).toHaveAttribute('lang', 'uz');
+  expect(updatePassword).not.toHaveBeenCalled();
+});
+
+test('settings reset displays save errors and keeps the confirmation open', async () => {
+  setDoc.mockRejectedValueOnce(new Error('Network unavailable'));
+  render(<App />);
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Ma’lumotlarni o‘chirish' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ha, hamma ma’lumotni o‘chirish' }));
+
+  expect(await screen.findByText('Ma’lumotlarni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Bekor qilish' })).toBeInTheDocument();
+  expect(screen.queryByText('Ma’lumotlaringiz o‘chirildi. Ism, familiya, email va parolingiz saqlab qolindi.')).not.toBeInTheDocument();
+  expect(updatePassword).not.toHaveBeenCalled();
 });
 
 test('daily motivation selects a stable quote from the 25-message collection', () => {

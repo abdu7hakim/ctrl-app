@@ -1,5 +1,9 @@
 export const profileImageStorageKey = (uid) => `ctrl-profile-image-${uid}`;
 
+export const createProfileImagePath = (uid) => (
+  `users/${uid}/profile/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+);
+
 export const getStoredProfileImage = (uid) => {
   try {
     return window.localStorage.getItem(profileImageStorageKey(uid)) || '';

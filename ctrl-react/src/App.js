@@ -11,11 +11,12 @@ import ContactPage from './components/contact/ContactPage';
 import SettingsPage from './components/settings/SettingsPage';
 import { defaultThemeId, getColorTheme } from './utils/themes';
 import { isTodoOverdue } from './utils/todoDeadlines';
-import { getStoredProfileImage } from './utils/profileImage';
+import { createProfileImagePath, getStoredProfileImage, profileImageStorageKey } from './utils/profileImage';
 import { getStoredLanguage, saveStoredLanguage, translate } from './utils/language';
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import './App.css';
 
 const initialData = {
@@ -133,6 +134,37 @@ function App() {
             email: identity.email,
           };
           const storedData = snapshot.exists() ? snapshot.data() : {};
+          let photoURL = typeof storedData.photoURL === 'string' ? storedData.photoURL : '';
+          let photoPath = typeof storedData.photoPath === 'string' ? storedData.photoPath : '';
+          if (!photoURL && localPhotoURL.startsWith('data:image/')) {
+            const migratedPath = createProfileImagePath(firebaseUser.uid);
+            const migratedRef = ref(storage, migratedPath);
+            let uploadCompleted = false;
+            try {
+              const uploadedPhoto = await uploadString(migratedRef, localPhotoURL, 'data_url');
+              uploadCompleted = true;
+              photoURL = await getDownloadURL(uploadedPhoto.ref);
+              photoPath = migratedPath;
+              await setDoc(userRef, { photoURL, photoPath }, { merge: true });
+              try {
+                window.localStorage.removeItem(profileImageStorageKey(firebaseUser.uid));
+              } catch (storageError) {
+                console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
+              }
+            } catch (migrationError) {
+              if (uploadCompleted) {
+                try {
+                  await deleteObject(migratedRef);
+                } catch (cleanupError) {
+                  console.error('Ko‘chirilmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
+                }
+              }
+              photoURL = localPhotoURL;
+              photoPath = '';
+              console.error('Eski profil rasmini Firebase Storage’ga ko‘chirishda xatolik:', migrationError);
+              setNotice('Eski profil rasmini hisobingizga saqlab bo‘lmadi. Profil sahifasidan qayta yuklang.');
+            }
+          }
           const nextData = {
             ...initialData,
             ...storedData,
@@ -144,7 +176,8 @@ function App() {
             routineBadges: Array.isArray(storedData.routineBadges) ? storedData.routineBadges : [],
             darkMode: typeof storedData.darkMode === 'boolean' ? storedData.darkMode : false,
             colorTheme: getColorTheme(storedData.colorTheme).id,
-            photoURL: localPhotoURL,
+            photoURL: photoURL || localPhotoURL,
+            photoPath,
             focusDurationMinutes: Number.isSafeInteger(storedData.focusDurationMinutes)
               && storedData.focusDurationMinutes > 0
               && storedData.focusDurationMinutes <= Math.floor(Number.MAX_SAFE_INTEGER / 60)
@@ -184,6 +217,7 @@ function App() {
               firstName: storedData.firstName || identity.firstName,
               lastName: storedData.lastName || identity.lastName,
               photoURL: nextData.photoURL,
+              photoPath: nextData.photoPath,
             });
           }
           if (active && generation === authGeneration.current) setData(nextData);
@@ -291,6 +325,50 @@ function App() {
     }
     await updateDoc(doc(db, 'users', user.uid), { [field]: value });
     setData((current) => ({ ...current, [field]: value }));
+  };
+
+  const resetUserData = async () => {
+    if (!user || auth.currentUser?.uid !== user.uid) {
+      throw new Error('Ma’lumotlarni o‘chirish uchun hisobingizga kiring.');
+    }
+
+    if (user.photoPath) {
+      try {
+        await deleteObject(ref(storage, user.photoPath));
+      } catch (error) {
+        if (error.code !== 'storage/object-not-found') throw error;
+      }
+    }
+
+    await setDoc(doc(db, 'users', user.uid), {
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: auth.currentUser.email || user.email || '',
+    });
+
+    latestData.current = initialData;
+    setData(initialData);
+    setDarkMode(initialData.darkMode);
+    setColorTheme(initialData.colorTheme);
+    setLanguageState(initialData.language);
+    setUser((currentUser) => ({ ...currentUser, photoURL: '', photoPath: '' }));
+
+    const localStorageErrors = [];
+    try {
+      window.localStorage.removeItem(profileImageStorageKey(user.uid));
+    } catch (error) {
+      console.error('Profil rasmini brauzer xotirasidan o‘chirishda xatolik:', error);
+      localStorageErrors.push(error);
+    }
+    try {
+      window.localStorage.removeItem('ctrl-app-language');
+    } catch (error) {
+      console.error('Til sozlamasini brauzer xotirasidan o‘chirishda xatolik:', error);
+      localStorageErrors.push(error);
+    }
+    setNotice(localStorageErrors.length
+      ? 'Ma’lumotlar hisobingizdan o‘chirildi, ammo ayrim brauzer ma’lumotlarini o‘chira olmadik.'
+      : '');
   };
 
   const saveRoutine = async ({ routine, routineBadges }) => {
@@ -459,7 +537,7 @@ function App() {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} language={language} />,
     todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} language={language} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} language={language} />,
-    routine: <RoutinePage routines={data.routine} routineBadges={data.routineBadges} onSave={saveRoutine} />,
+    routine: <RoutinePage routines={data.routine} routineBadges={data.routineBadges} onSave={saveRoutine} language={language} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
       setNotice('Profil ma’lumotlari saqlandi.');
@@ -473,6 +551,7 @@ function App() {
       onChangeLanguage={changeLanguage}
       onToggleTheme={toggleTheme}
       onSelectColorTheme={saveColorTheme}
+      onResetData={resetUserData}
     />,
   };
 

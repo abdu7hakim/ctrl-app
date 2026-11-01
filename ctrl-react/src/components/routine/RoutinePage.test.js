@@ -5,8 +5,10 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+const renderEnglishRoutine = (props = {}) => render(<RoutinePage language="en" {...props} />);
+
 test('marks routine dates in the calendar and changes the visible date', () => {
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   const today = new Date();
   const todayButton = screen.getByRole('button', {
@@ -20,8 +22,18 @@ test('marks routine dates in the calendar and changes the visible date', () => {
   expect(screen.getByText('Review priorities')).toBeInTheDocument();
 });
 
+test('renders routine controls in Uzbek when Uzbek is selected', () => {
+  render(<RoutinePage routines={{}} routineBadges={[]} onSave={jest.fn()} language="uz" />);
+
+  expect(screen.getByRole('heading', { name: 'Taqvim' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Hafta kunlarini tanlang' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Boshlanish sanasi')).toBeInTheDocument();
+  expect(screen.getByLabelText('Yangi vazifa qo‘shish...')).toBeInTheDocument();
+  expect(screen.queryByText('Save Routine')).not.toBeInTheDocument();
+});
+
 test('shows an inclusive date range and adds a task to the selected day', () => {
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   const today = new Date();
   const rangeEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2);
@@ -41,7 +53,7 @@ test('shows an inclusive date range and adds a task to the selected day', () => 
 });
 
 test('assigns the selected badge color to a new task', () => {
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   fireEvent.change(screen.getByLabelText('Task badge'), { target: { value: 'Health' } });
   fireEvent.change(screen.getByLabelText('Add a new task...'), { target: { value: 'Drink water' } });
@@ -52,7 +64,8 @@ test('assigns the selected badge color to a new task', () => {
 });
 
 test('shows only tasks for the selected date and an empty state for dates without tasks', () => {
-  render(<RoutinePage />);
+  jest.useFakeTimers().setSystemTime(new Date(2026, 9, 31, 12));
+  renderEnglishRoutine();
 
   const today = new Date();
   const nextMonthFirst = new Date(today.getFullYear(), today.getMonth() + 1, 1);
@@ -76,7 +89,7 @@ test('shows only tasks for the selected date and an empty state for dates withou
 
 test('copies the current routine to dates matching selected weekdays', async () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 31, 12));
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   const nextMonthFirst = new Date(2026, 10, 1);
   const weekdayLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -98,7 +111,7 @@ test('copies the current routine to dates matching selected weekdays', async () 
 
 test('saves a routine to a date range without selecting weekdays', () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 31, 12));
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   const nextMonthFirst = new Date(2026, 10, 1);
   const nextMonthSecond = new Date(2026, 10, 2);
@@ -127,8 +140,9 @@ test('saves a routine to a date range without selecting weekdays', () => {
 });
 
 test('creates a custom badge and uses it on a new task', async () => {
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
+  fireEvent.click(screen.getByRole('button', { name: 'Add badge' }));
   fireEvent.change(screen.getByLabelText('New badge name'), { target: { value: 'Learning' } });
   fireEvent.change(screen.getByLabelText('New badge color'), { target: { value: 'indigo' } });
   await act(async () => {
@@ -143,9 +157,71 @@ test('creates a custom badge and uses it on a new task', async () => {
   expect(learningBadge).toHaveClass('routine-badge-indigo');
 });
 
+test('places the task entry controls in a new editable table row', () => {
+  renderEnglishRoutine();
+
+  const taskInput = screen.getByLabelText('Add a new task...');
+  expect(taskInput).toHaveAttribute('placeholder', 'Type a task...');
+  expect(taskInput.closest('[role="row"]')).toBeInTheDocument();
+  expect(taskInput.closest('[role="table"]')).toBeInTheDocument();
+});
+
+test('reveals task actions on selection and edits the task inline', () => {
+  renderEnglishRoutine();
+
+  expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Morning stretch' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.change(screen.getByLabelText('Edit task'), { target: { value: 'Morning yoga' } });
+  fireEvent.change(screen.getByLabelText('Edit task time'), { target: { value: '08:30' } });
+  fireEvent.change(screen.getByLabelText('Edit task badge'), { target: { value: 'Personal' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save task edit' }));
+
+  expect(screen.getByText('Morning yoga')).toBeInTheDocument();
+  expect(screen.queryByText('Morning stretch')).not.toBeInTheDocument();
+  expect(screen.getByText('08:30')).toBeInTheDocument();
+  expect(screen.getAllByText('Personal').find((element) => element.classList.contains('routine-badge'))).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+});
+
+test('deletes a task from its revealed row actions', () => {
+  renderEnglishRoutine();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Morning stretch' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+  expect(screen.queryByText('Morning stretch')).not.toBeInTheDocument();
+  expect(screen.getByText('Review priorities')).toBeInTheDocument();
+});
+
+test('confirms custom badge deletion and moves its tasks to General', () => {
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  render(
+    <RoutinePage
+      routines={{
+        [todayKey]: [
+          { id: 'learning-task', time: '10:00', task: 'Study', category: 'Learning', done: false },
+        ],
+      }}
+      routineBadges={[{ name: 'Learning', color: 'indigo' }]}
+      language="en"
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add badge' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete Learning badge' }));
+  expect(screen.getByText('Tasks using this badge will become General.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+  expect(screen.getByText('Study')).toBeInTheDocument();
+  expect(screen.getAllByText('General').find((element) => element.classList.contains('routine-badge'))).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'Learning' })).not.toBeInTheDocument();
+});
+
 test('persists task changes and custom badges through the provided save handler', async () => {
   const onSave = jest.fn().mockResolvedValue();
-  render(<RoutinePage routines={{}} routineBadges={[]} onSave={onSave} />);
+  renderEnglishRoutine({ routines: {}, routineBadges: [], onSave });
 
   fireEvent.change(screen.getByLabelText('Add a new task...'), { target: { value: 'Plan the day' } });
   await act(async () => {
@@ -165,6 +241,7 @@ test('persists task changes and custom badges through the provided save handler'
     routineBadges: [],
   });
 
+  fireEvent.click(screen.getByRole('button', { name: 'Add badge' }));
   fireEvent.change(screen.getByLabelText('New badge name'), { target: { value: 'Learning' } });
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create badge' }));
@@ -178,7 +255,7 @@ test('persists task changes and custom badges through the provided save handler'
 
 test('limits planning to three recent days and the allowed current-month window', () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 31, 12));
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
   const allowedNextWeekDay = screen.getByRole('button', { name: 'Sunday, November 8, 2026' });
@@ -207,7 +284,7 @@ test('limits planning to three recent days and the allowed current-month window'
 
 test('automatically removes routines older than the last three calendar days', () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 31, 12));
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   fireEvent.change(screen.getByLabelText('Add a new task...'), { target: { value: 'Temporary routine' } });
   fireEvent.submit(screen.getByLabelText('Add a new task...').closest('form'));
@@ -237,7 +314,7 @@ test.each([
   },
 ])('applies the month-end planning window dynamically for $today', ({ today, allowedDate, blockedDate, allowedMax }) => {
   jest.useFakeTimers().setSystemTime(today);
-  render(<RoutinePage />);
+  renderEnglishRoutine();
 
   expect(screen.getByLabelText('End date')).toHaveAttribute('max', allowedMax);
 

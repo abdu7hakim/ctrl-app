@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -14,6 +15,8 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
   const [mode, setMode] = useState('signup');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const isSignup = mode === 'signup';
+  const panelTransition = { duration: 0.4, ease: 'easeInOut' };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -69,7 +72,7 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
       }
     } catch (submitError) {
       // Firebase xatoliklarini o'zbekchaga yaqinlashtirish (ixtiyoriy)
-      let errorMessage = submitError.message;
+      let errorMessage = 'Tizimga kirishda xatolik yuz berdi. Qayta urinib ko‘ring.';
       if (submitError.code === 'auth/email-already-in-use') {
         errorMessage = "Bu email allaqachon ro'yxatdan o'tgan.";
       } else if (submitError.code === 'auth/invalid-credential' || submitError.code === 'auth/wrong-password') {
@@ -93,8 +96,8 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
   };
 
   return (
-    <main className="auth-page">
-      <section className="auth-art">
+    <main className={`auth-page${isSignup ? '' : ' auth-page-login'}`}>
+      <motion.section layout transition={panelTransition} className="auth-art">
         <div className="brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
         <div className="auth-hero">
           <span className="eyebrow">{t('SHAXSIY MAKONINGIZ')}</span>
@@ -102,9 +105,17 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
           <p>{t('Vazifalar, odatlar va diqqat — barchasi bir joyda.')}</p>
         </div>
         <div className="auth-art-footer">{t('Fikringizni jamlang. Maqsad sari yuring.')}</div>
-      </section>
-      <section className="auth-panel">
-        <div className="auth-card">
+      </motion.section>
+      <motion.section layout transition={panelTransition} className="auth-panel">
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={mode}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          className="auth-card"
+        >
           <button className="auth-language-toggle" type="button" onClick={() => onChangeLanguage(language === 'uz' ? 'en' : 'uz')} aria-label={t('Tilni almashtirish')}>
             <i className="ph ph-globe-hemisphere-west" aria-hidden="true" /> {language === 'uz' ? 'EN' : 'UZ'}
           </button>
@@ -136,8 +147,9 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
               {t(mode === 'signup' ? 'Kirish' : 'Ro‘yxatdan o‘tish')}
             </button>
           </p>
-        </div>
-      </section>
+        </motion.div>
+        </AnimatePresence>
+      </motion.section>
     </main>
   );
 }

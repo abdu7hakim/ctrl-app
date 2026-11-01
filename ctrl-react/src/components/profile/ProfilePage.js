@@ -6,8 +6,9 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../../firebase';
-import { createProfileImageDataUrl, profileImageStorageKey } from '../../utils/profileImage';
+import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
+import { auth, db, storage } from '../../firebase';
+import { createProfileImageDataUrl, createProfileImagePath, profileImageStorageKey } from '../../utils/profileImage';
 import { translate } from '../../utils/language';
 
 const maxProfileImageSize = 5 * 1024 * 1024;
@@ -59,7 +60,7 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
       setSaved(true);
     } catch (saveError) {
       console.error('Profilni saqlashda xatolik:', saveError);
-      setError(saveError.message || 'Profilni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Profilni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setSaving(false);
     }
@@ -89,17 +90,46 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
         throw new Error('Rasm yuklash uchun hisobingizga qayta kiring.');
       }
 
-      const photoURL = await createProfileImageDataUrl(image);
+      const photoDataUrl = await createProfileImageDataUrl(image);
+      const photoPath = createProfileImagePath(user.uid);
+      const photoRef = ref(storage, photoPath);
+      let uploadCompleted = false;
       try {
-        window.localStorage.setItem(profileImageStorageKey(user.uid), photoURL);
-      } catch (storageError) {
-        throw new Error('Profil rasmini brauzer xotirasiga saqlab bo‘lmadi. Boshqa yoki kichikroq rasm tanlang.');
+        const uploadedPhoto = await uploadString(photoRef, photoDataUrl, 'data_url');
+        uploadCompleted = true;
+        const photoURL = await getDownloadURL(uploadedPhoto.ref);
+        await updateDoc(doc(db, 'users', user.uid), { photoURL, photoPath });
+        onSave({ ...user, photoURL, photoPath });
+        setSaved(true);
+      } catch (uploadError) {
+        if (uploadCompleted) {
+          try {
+            await deleteObject(photoRef);
+          } catch (cleanupError) {
+            console.error('Yuklanmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
+          }
+        }
+        throw uploadError;
       }
-      onSave({ ...user, photoURL });
-      setSaved(true);
+
+      if (user.photoPath) {
+        try {
+          await deleteObject(ref(storage, user.photoPath));
+        } catch (cleanupError) {
+          if (cleanupError.code !== 'storage/object-not-found') {
+            console.error('Eski profil rasmini Firebase Storage’dan o‘chirishda xatolik:', cleanupError);
+            setError('Yangi rasm saqlandi, ammo eski rasmni o‘chirib bo‘lmadi.');
+          }
+        }
+      }
+      try {
+        window.localStorage.removeItem(profileImageStorageKey(user.uid));
+      } catch (storageError) {
+        console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
+      }
     } catch (uploadError) {
       console.error('Profil rasmini yuklashda xatolik:', uploadError);
-      setError(uploadError.message || 'Rasmni yuklab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Rasmni Firebase’ga yuklab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setUploadingImage(false);
     }
@@ -115,7 +145,7 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
     if (securitySaveError.code === 'auth/requires-recent-login') {
       return 'Xavfsizlik uchun hisobingizdan chiqib, qayta kiring va yana urinib ko‘ring.';
     }
-    return securitySaveError.message || fallback;
+    return fallback;
   };
 
   const changePassword = async (event) => {

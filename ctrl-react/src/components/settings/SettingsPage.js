@@ -1,8 +1,29 @@
+import { useState } from 'react';
 import { colorThemes } from '../../utils/themes';
 import { translate } from '../../utils/language';
 
-function SettingsPage({ darkMode, themeSaving, colorTheme, language = 'uz', onChangeLanguage, onToggleTheme, onSelectColorTheme }) {
+function SettingsPage({ darkMode, themeSaving, colorTheme, language = 'uz', onChangeLanguage, onToggleTheme, onSelectColorTheme, onResetData }) {
   const t = (text) => translate(text, language);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetComplete, setResetComplete] = useState(false);
+
+  const resetData = async () => {
+    setResetError('');
+    setResetSaving(true);
+    try {
+      await onResetData();
+      setConfirmReset(false);
+      setResetComplete(true);
+    } catch (error) {
+      console.error('Foydalanuvchi ma’lumotlarini tiklashda xatolik:', error);
+      setResetError('Ma’lumotlarni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.');
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
   return (
     <div className="page-content">
       <section className="surface-card settings-card">
@@ -59,6 +80,32 @@ function SettingsPage({ darkMode, themeSaving, colorTheme, language = 'uz', onCh
             </button>
           ))}
         </div>
+      </section>
+      <section className="surface-card settings-reset-card" aria-labelledby="settings-reset-heading">
+        <div className="settings-reset-copy">
+          <span className="stat-icon red"><i className="ph ph-trash" aria-hidden="true" /></span>
+          <div>
+            <h2 id="settings-reset-heading">{t('Barcha ma’lumotlarni o‘chirish')}</h2>
+            <p>{t('Vazifalar, odatlar, kun tartibi, fokus statistikasi va ilova sozlamalari o‘chiriladi. Ism, familiya, email va parolingiz saqlanib qoladi.')}</p>
+          </div>
+        </div>
+        {!confirmReset
+          ? <button className="button settings-reset-button" type="button" onClick={() => { setResetComplete(false); setConfirmReset(true); }} disabled={resetSaving || themeSaving}>
+            {t('Ma’lumotlarni o‘chirish')}
+          </button>
+          : <div className="settings-reset-confirmation" role="alert">
+            <p>{t('Bu amalni bekor qilib bo‘lmaydi. Ishonchingiz komilmi?')}</p>
+            <div>
+              <button className="button settings-reset-button" type="button" onClick={resetData} disabled={resetSaving || themeSaving}>
+                {resetSaving ? t('O‘chirilmoqda...') : t('Ha, hamma ma’lumotni o‘chirish')}
+              </button>
+              <button className="button settings-reset-cancel" type="button" onClick={() => setConfirmReset(false)} disabled={resetSaving || themeSaving}>
+                {t('Bekor qilish')}
+              </button>
+            </div>
+          </div>}
+        {resetError && <p className="settings-reset-error" role="alert">{t(resetError)}</p>}
+        {resetComplete && <p className="settings-reset-success" role="status">{t('Ma’lumotlaringiz o‘chirildi. Ism, familiya, email va parolingiz saqlab qolindi.')}</p>}
       </section>
     </div>
   );

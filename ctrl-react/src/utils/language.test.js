@@ -6,6 +6,9 @@ import { getStoredLanguage, saveStoredLanguage, translate } from './language';
 test('translates app copy to English and keeps Uzbek as the default', () => {
   expect(translate('Vazifalar', 'en')).toBe('Tasks');
   expect(translate('Vazifalar', 'uz')).toBe('Vazifalar');
+  expect(translate('Calendar', 'uz')).toBe('Taqvim');
+  expect(translate('Calendar', 'en')).toBe('Calendar');
+  expect(translate('Kunlik faollik', 'en')).toBe('Daily activity');
   expect(translate('Untranslated user content', 'en')).toBe('Untranslated user content');
 });
 

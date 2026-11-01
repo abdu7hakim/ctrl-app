@@ -90,7 +90,7 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
       return true;
     } catch (saveError) {
       console.error('Odatlarni saqlashda xatolik:', saveError);
-      setError(saveError.message || 'Odatlarni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Odatlarni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
       return false;
     } finally {
       setSaving(false);

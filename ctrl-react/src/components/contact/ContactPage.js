@@ -34,7 +34,7 @@ function ContactPage({ user, onSend, language = 'uz' }) {
       onSend();
     } catch (sendError) {
       console.error('Aloqa xabarini yuborishda xatolik:', sendError);
-      setError(sendError.message || 'Xabarni yuborib bo‘lmadi. Qayta urinib ko‘ring.');
+      setError('Xabarni yuborib bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setSaving(false);
     }
