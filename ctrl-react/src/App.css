@@ -39,7 +39,7 @@ button { cursor: pointer; }
 .tip-icon { display: grid; width: 28px; height: 28px; margin-bottom: 12px; place-items: center; border-radius: 9px; color: var(--primary); background: var(--surface); font-size: 17px; }
 .logout-link { margin-bottom: 12px; }
 .sidebar-version { display: block; padding: 0 12px; color: var(--muted); font-size: 9px; }
-.main-area { width: calc(100% - 252px); min-height: 100vh; margin-left: 252px; }
+.main-area { width: calc(100% - 252px); min-width: 0; min-height: 100vh; margin-left: 252px; }
 .topbar { position: sticky; z-index: 10; top: 0; display: flex; min-height: 88px; align-items: center; justify-content: space-between; padding: 13px clamp(24px, 4vw, 58px); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 92%, transparent); backdrop-filter: blur(14px); }
 .topbar-heading-row { display: flex; align-items: center; gap: 18px; margin-top: 4px; }
 .topbar-title h1 { flex: 0 0 auto; margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.035em; }
@@ -55,6 +55,28 @@ button { cursor: pointer; }
 .content-area { max-width: 1500px; margin: 0 auto; padding: 35px clamp(24px, 4vw, 58px) 60px; }
 .page-content { display: grid; gap: 23px; animation: fade-in .25s ease both; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.main-area-leaderboard { background: #FAF9F7; }
+.main-area-leaderboard .topbar { background: color-mix(in srgb, #FAF9F7 92%, transparent); }
+.main-area-leaderboard .content-area { display: grid; min-height: calc(100vh - 88px); place-items: center; padding-top: 40px; padding-bottom: 40px; }
+.leaderboard-page { display: grid; width: 100%; place-items: center; }
+.leaderboard-card { width: min(100%, 720px); padding: 48px; border: 1px solid #efede9; border-radius: 24px; color: #242321; background: #fff; box-shadow: 0 4px 18px rgba(37, 34, 28, .055); text-align: center; }
+.leaderboard-trophy { display: grid; width: 68px; height: 68px; margin: 0 auto 21px; place-items: center; border-radius: 22px; color: #b98127; background: #fbf3e5; }
+.leaderboard-eyebrow { color: #9a7a48; font-size: 10px; font-weight: 750; letter-spacing: .16em; }
+.leaderboard-card h2 { margin: 12px 0 10px; font-size: clamp(25px, 4vw, 34px); font-weight: 700; letter-spacing: -.045em; line-height: 1.2; }
+.leaderboard-description { max-width: 530px; margin: 0 auto; color: #77746e; font-size: 14px; line-height: 1.7; }
+.leaderboard-share-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 16px; margin-top: 32px; }
+.leaderboard-invite-panel, .leaderboard-qr-panel { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; background: #faf9f7; }
+.leaderboard-invite-panel { min-height: 204px; padding: 22px 14px 12px; }
+.leaderboard-share-icon { display: grid; width: 42px; height: 42px; margin-bottom: 11px; place-items: center; border: 1px solid #eeece7; border-radius: 14px; color: #57544e; background: #fff; }
+.leaderboard-invite-panel p { margin: 0 0 14px; color: #706d67; font-size: 12px; }
+.leaderboard-invite-button { display: inline-flex; min-height: 43px; align-items: center; justify-content: center; gap: 9px; padding: 0 16px; border: 0; border-radius: 12px; color: #fff; background: #242321; font-size: 12px; font-weight: 650; transition: background .18s ease, transform .18s ease; }
+.leaderboard-invite-button:hover { transform: translateY(-1px); background: #44413b; }
+.leaderboard-invite-button:focus-visible { outline: 3px solid #b9a783; outline-offset: 3px; }
+.leaderboard-copy-status { min-height: 16px; margin-top: 8px; color: #5b7757; font-size: 10px; }
+.leaderboard-qr-panel { gap: 11px; padding: 16px; border: 1px solid #f0eee9; background: #fff; }
+.leaderboard-qr-panel svg { display: block; max-width: 100%; height: auto; }
+.leaderboard-qr-panel > span { color: #77746e; font-size: 10px; }
+.leaderboard-footer { margin: 27px 0 0; color: #88847d; font-size: 11px; }
 .eyebrow { display: block; color: var(--primary); font-size: 9px; font-weight: 800; letter-spacing: .15em; }
 .date-pill { display: inline-flex; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--surface); font-size: 10px; font-weight: 600; white-space: nowrap; }
 .date-pill .ph { color: var(--primary); font-size: 15px; }
@@ -122,11 +144,11 @@ button { cursor: pointer; }
 .stat-card > strong { display: block; margin-top: 15px; font-size: 28px; letter-spacing: -.04em; }
 .stat-card > strong small { color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0; }
 .stat-card > p, .stat-card-description { display: block; margin: 4px 0 0; color: var(--muted); font-size: 9px; }
-.activity-card { max-width: 100%; margin: 16px 0; padding: 22px; }
+.activity-card { max-width: 100%; min-width: 0; margin: 16px 0; padding: 22px; }
 .activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .activity-heading h3 { margin: 6px 0 0; font-size: 16px; letter-spacing: -.025em; }
 .activity-period { color: var(--muted); font-size: 10px; }
-.activity-chart { overflow-x: auto; margin-top: 17px; padding: 0 0 5px; }
+.activity-chart { max-width: 100%; min-width: 0; overflow-x: auto; margin-top: 17px; padding: 0 0 5px; overscroll-behavior-x: contain; }
 .activity-months, .activity-cells { display: grid; width: max-content; min-width: 100%; grid-template-columns: repeat(26, 12px); column-gap: 4px; }
 .activity-months { min-height: 20px; color: var(--muted); font-size: 9px; }
 .activity-cells { grid-template-rows: repeat(7, 12px); grid-auto-flow: column; row-gap: 4px; }
@@ -687,4 +709,15 @@ button { cursor: pointer; }
   .profile-summary h3 { font-size: 12px; }
   .profile-summary p { font-size: 9px; }
   .profile-form-footer { flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .main-area-leaderboard .content-area { min-height: calc(100vh - 73px); padding: 28px 16px; }
+  .leaderboard-card { padding: 32px 22px; border-radius: 21px; }
+  .leaderboard-description { font-size: 13px; }
+  .leaderboard-share-grid { gap: 10px; margin-top: 25px; }
+  .leaderboard-invite-panel { min-height: 182px; padding-right: 8px; padding-left: 8px; }
+  .leaderboard-qr-panel { gap: 9px; padding: 12px 8px; }
+  .leaderboard-qr-panel svg { width: 112px; height: 112px; }
+  .leaderboard-invite-button { gap: 6px; padding: 0 10px; font-size: 11px; }
+  .leaderboard-footer { margin-top: 22px; }
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AuthScreen from './components/auth/AuthScreen';
 import DashboardLayout from './components/layout/DashboardLayout';
 import OverviewPage from './components/dashboard/OverviewPage';
+import LeaderboardPage from './components/leaderboard/LeaderboardPage';
 import TodoPage from './components/todo/TodoPage';
 import HabitsPage from './components/habits/HabitsPage';
 import RoutinePage from './components/routine/RoutinePage';
@@ -554,6 +555,7 @@ function App() {
 
   const pages = {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} language={language} />,
+    leaderboard: <LeaderboardPage />,
     todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} language={language} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} language={language} />,
     routine: <RoutinePage routines={data.routine} routineBadges={data.routineBadges} onSave={saveRoutine} language={language} />,

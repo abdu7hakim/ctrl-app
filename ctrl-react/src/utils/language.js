@@ -5,6 +5,7 @@ const englishTranslations = {
   'Odatlar': 'Habits',
   'Kun tartibi': 'Daily Routine',
   'Diqqat vaqti': 'Focus',
+  'Reyting': 'Leaderboard',
   'Profil': 'Profile',
   'Aloqa': 'Contact',
   'Sozlamalar': 'Settings',

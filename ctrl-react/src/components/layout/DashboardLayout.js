@@ -7,6 +7,7 @@ const navigation = [
   { id: 'habits', title: 'Odatlar', icon: 'ph-calendar-check' },
   { id: 'routine', title: 'Kun tartibi', icon: 'ph-calendar-blank' },
   { id: 'focus', title: 'Diqqat vaqti', icon: 'ph-timer' },
+  { id: 'leaderboard', title: 'Reyting', icon: 'ph-trophy' },
   { id: 'profile', title: 'Profil', icon: 'ph-user-circle' },
   { id: 'contact', title: 'Aloqa', icon: 'ph-chat-circle-dots' },
 ];
@@ -17,6 +18,7 @@ const pageTitles = {
   habits: 'Odatlar',
   routine: 'Kun tartibi',
   focus: 'Diqqat vaqti',
+  leaderboard: 'Reyting',
   profile: 'Profil',
   contact: 'Aloqa',
   settings: 'Sozlamalar',
@@ -85,7 +87,7 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
           <span className="sidebar-version">{t('CTRL App · Shaxsiy unumdorlik')}</span>
         </div>
       </aside>
-      <main className="main-area">
+      <main className={`main-area ${page === 'leaderboard' ? 'main-area-leaderboard' : ''}`}>
         <header className="topbar">
           <button className="icon-button mobile-menu-button" aria-label={t('Menyuni ochish')} onClick={() => setMenuOpen(true)}><i className="ph ph-list" /></button>
           <div className="topbar-title">
