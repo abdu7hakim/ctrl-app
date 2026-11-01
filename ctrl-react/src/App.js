@@ -116,6 +116,7 @@ function App() {
         email: firebaseUser.email || '',
         ...getNameParts(firebaseUser.displayName, firebaseUser.email),
         photoURL: localPhotoURL,
+        photoPath: '',
       };
       setUser(identity);
       setAuthError('');
@@ -136,35 +137,6 @@ function App() {
           const storedData = snapshot.exists() ? snapshot.data() : {};
           let photoURL = typeof storedData.photoURL === 'string' ? storedData.photoURL : '';
           let photoPath = typeof storedData.photoPath === 'string' ? storedData.photoPath : '';
-          if (!photoURL && localPhotoURL.startsWith('data:image/')) {
-            const migratedPath = createProfileImagePath(firebaseUser.uid);
-            const migratedRef = ref(storage, migratedPath);
-            let uploadCompleted = false;
-            try {
-              const uploadedPhoto = await uploadString(migratedRef, localPhotoURL, 'data_url');
-              uploadCompleted = true;
-              photoURL = await getDownloadURL(uploadedPhoto.ref);
-              photoPath = migratedPath;
-              await setDoc(userRef, { photoURL, photoPath }, { merge: true });
-              try {
-                window.localStorage.removeItem(profileImageStorageKey(firebaseUser.uid));
-              } catch (storageError) {
-                console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
-              }
-            } catch (migrationError) {
-              if (uploadCompleted) {
-                try {
-                  await deleteObject(migratedRef);
-                } catch (cleanupError) {
-                  console.error('Ko‘chirilmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
-                }
-              }
-              photoURL = localPhotoURL;
-              photoPath = '';
-              console.error('Eski profil rasmini Firebase Storage’ga ko‘chirishda xatolik:', migrationError);
-              setNotice('Eski profil rasmini hisobingizga saqlab bo‘lmadi. Profil sahifasidan qayta yuklang.');
-            }
-          }
           const nextData = {
             ...initialData,
             ...storedData,
@@ -255,6 +227,53 @@ function App() {
       unsubscribe();
     };
   }, [reloadKey]);
+
+  useEffect(() => {
+    if (!user || dataLoading || !user.photoURL?.startsWith('data:image/')) return undefined;
+    let active = true;
+    let uploadedRef;
+
+    const migrateProfileImage = async () => {
+      try {
+        const photoPath = createProfileImagePath(user.uid);
+        uploadedRef = ref(storage, photoPath);
+        const uploadedPhoto = await uploadString(uploadedRef, user.photoURL, 'data_url');
+        const photoURL = await getDownloadURL(uploadedPhoto.ref);
+        if (!active || auth.currentUser?.uid !== user.uid) {
+          await deleteObject(uploadedRef);
+          return;
+        }
+
+        await setDoc(doc(db, 'users', user.uid), { photoURL, photoPath }, { merge: true });
+        if (!active) return;
+        setUser((currentUser) => (
+          currentUser?.uid === user.uid ? { ...currentUser, photoURL, photoPath } : currentUser
+        ));
+        try {
+          window.localStorage.removeItem(profileImageStorageKey(user.uid));
+        } catch (storageError) {
+          console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
+        }
+      } catch (migrationError) {
+        if (uploadedRef) {
+          try {
+            await deleteObject(uploadedRef);
+          } catch (cleanupError) {
+            if (cleanupError.code !== 'storage/object-not-found') {
+              console.error('Ko‘chirilmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
+            }
+          }
+        }
+        console.error('Eski profil rasmini Firebase Storage’ga ko‘chirishda xatolik:', migrationError);
+        if (active) setNotice('Eski profil rasmini hisobingizga saqlab bo‘lmadi. Profil sahifasidan qayta yuklang.');
+      }
+    };
+
+    migrateProfileImage();
+    return () => {
+      active = false;
+    };
+  }, [dataLoading, user]);
 
   useEffect(() => {
     if (!notice) return undefined;

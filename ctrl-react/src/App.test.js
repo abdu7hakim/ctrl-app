@@ -480,6 +480,15 @@ test('existing local profile images are migrated to Firebase when loading the ac
   expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBeNull();
 });
 
+test('a pending profile image migration does not block loading the account', async () => {
+  window.localStorage.setItem('ctrl-profile-image-user-1', 'data:image/jpeg;base64,saved-avatar');
+  uploadString.mockReturnValue(new Promise(() => {}));
+
+  render(<App />);
+
+  expect(await screen.findByRole('navigation', { name: 'Asosiy menyu' })).toBeInTheDocument();
+});
+
 test('profile image is restored from Firebase when no local image exists', async () => {
   getDoc.mockResolvedValue({
     exists: () => true,
