@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { createId } from '../../utils/helpers';
 import { translate } from '../../utils/language';
+import Skeleton from '../ui/Skeleton';
 
 const colors = ['#7157e8', '#e47070', '#e9a23b', '#39a982', '#4b91d1', '#d35ca3'];
 const weekdayNames = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
@@ -62,7 +63,7 @@ const getCurrentStreak = (completions, today, frequency) => {
   return streak;
 };
 
-function HabitsPage({ habits, onChange, language = 'uz' }) {
+function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
   const t = (text) => translate(text, language);
   const dayLabel = (count) => language === 'en' ? t(count === 1 ? 'kun' : 'kunlar') : 'kun';
   const nameInputRef = useRef(null);
@@ -186,7 +187,35 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
   const toggleHabitDetails = (id) => setExpandedHabitId((current) => (current === id ? null : id));
 
   return (
-    <div className="page-content">
+    <div className={`page-content ${isLoading ? 'page-content-loading' : 'page-content-loaded'}`}>
+      {isLoading ? (
+        <div className="habits-layout habits-skeleton" role="status" aria-label={t('Odatlar yuklanmoqda')}>
+          <section className="surface-card habits-list-card">
+            <div className="section-heading">
+              <div><Skeleton className="skeleton-line skeleton-line-short" /><Skeleton className="skeleton-line skeleton-line-heading" /></div>
+              <Skeleton className="skeleton-circle skeleton-progress" />
+            </div>
+            <div className="habit-list">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div className="habit-item habit-skeleton-row" key={index}>
+                  <Skeleton className="skeleton-circle" />
+                  <div className="todo-item-copy habit-skeleton-copy">
+                    <Skeleton className="skeleton-line skeleton-line-title" />
+                    <Skeleton className="skeleton-line skeleton-line-wide" />
+                    <Skeleton className="skeleton-line skeleton-line-short" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <aside className="surface-card add-task-card habits-skeleton-form">
+            <Skeleton className="skeleton-line skeleton-line-heading" />
+            <Skeleton className="skeleton-form-field" />
+            <Skeleton className="skeleton-form-field" />
+            <Skeleton className="skeleton-form-button" />
+          </aside>
+        </div>
+      ) : (
       <div className="habits-layout">
         <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">{t('BUGUN')}</span><h3>{t('Odatlarim')} <span className="heading-count">{doneCount}/{todayHabits.length}</span></h3></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${todayHabits.length ? (doneCount / todayHabits.length) * 100 : 0}%` }}><strong>{todayHabits.length ? Math.round((doneCount / todayHabits.length) * 100) : 0}<small>%</small></strong></span><span>{t('Bugungi natija')}</span></div></div>
           {habits.length ? <div className="habit-list">{habits.map((habit) => {
@@ -322,6 +351,7 @@ function HabitsPage({ habits, onChange, language = 'uz' }) {
           </form>
         </aside>
       </div>
+      )}
     </div>
   );
 }

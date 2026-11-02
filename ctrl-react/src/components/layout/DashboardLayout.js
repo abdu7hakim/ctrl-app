@@ -1,5 +1,15 @@
 import { useState } from 'react';
+import { CalendarCheck, CheckSquare, Home, Timer, Trophy } from 'lucide-react';
 import { translate } from '../../utils/language';
+import { getAvatarInitials } from '../../utils/avatars';
+
+const mobileNavigation = [
+  { id: 'dashboard', title: 'Umumiy', icon: Home },
+  { id: 'focus', title: 'Diqqat vaqti', icon: Timer },
+  { id: 'todo', title: 'Vazifalar', icon: CheckSquare },
+  { id: 'habits', title: 'Odatlar', icon: CalendarCheck },
+  { id: 'leaderboard', title: 'Reyting', icon: Trophy },
+];
 
 const navigation = [
   { id: 'dashboard', title: 'Umumiy', icon: 'ph-squares-four' },
@@ -54,7 +64,6 @@ const pageDescriptions = {
 function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onToggleTheme, onLogout, language = 'uz', onChangeLanguage, children }) {
   const t = (text) => translate(text, language);
   const [menuOpen, setMenuOpen] = useState(false);
-  const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase();
   const pageDescription = pageDescriptions[page];
 
   const navigate = (id) => {
@@ -127,16 +136,30 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
               </div>
             </details>
             <button className="profile-chip" onClick={() => navigate('profile')} aria-label={t('Profilni ochish')}>
-              {user.photoURL
-                ? <img className="avatar profile-chip-avatar" src={user.photoURL} alt="" />
-                : <span className="avatar">{initials || 'U'}</span>}
+              {user.avatar
+                ? <img className="profile-chip-avatar" src={`${process.env.PUBLIC_URL}${user.avatar}`} alt="" />
+                : <span className="profile-chip-initials">{getAvatarInitials(user)}</span>}
               <span className="profile-chip-name">{user.firstName}</span>
               <i className="ph ph-caret-down" />
             </button>
           </div>
         </header>
-        <div className="content-area">{children}</div>
+        <div className="content-area content-area-with-bottom-nav">{children}</div>
       </main>
+      <nav className="mobile-bottom-nav" aria-label={t('Mobil navigatsiya')}>
+        {mobileNavigation.map(({ id, title, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className={`mobile-bottom-nav-item ${page === id ? 'mobile-bottom-nav-item-active' : ''}`}
+            aria-current={page === id ? 'page' : undefined}
+            onClick={() => navigate(id)}
+          >
+            <Icon size={20} strokeWidth={page === id ? 2.4 : 2} aria-hidden="true" />
+            <span>{t(title)}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

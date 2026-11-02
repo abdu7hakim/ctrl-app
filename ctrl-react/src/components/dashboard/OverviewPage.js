@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { getDailyMotivation } from '../../utils/motivation';
 import { translate } from '../../utils/language';
 import { getActivityHeatmap } from '../../utils/activityHeatmap';
+import Skeleton from '../ui/Skeleton';
 
-function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
+function OverviewPage({ user, data, stats, onNavigate, isLoading = false, language = 'uz' }) {
   const t = (text) => translate(text, language);
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const today = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(currentDate);
@@ -25,7 +26,44 @@ function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
   const motivation = getDailyMotivation(currentDate);
 
   return (
-    <div className="page-content">
+    <div className={`page-content ${isLoading ? 'page-content-loading' : 'page-content-loaded'}`}>
+      {isLoading ? (
+        <div className="overview-skeleton" role="status" aria-label={t('Dashboard ma’lumotlari yuklanmoqda')}>
+          <section className="welcome-banner overview-skeleton-welcome">
+            <div>
+              <Skeleton className="skeleton-line skeleton-line-short" />
+              <Skeleton className="skeleton-line skeleton-line-heading" />
+              <Skeleton className="skeleton-line skeleton-line-wide" />
+              <Skeleton className="skeleton-form-button" />
+            </div>
+            <Skeleton className="overview-skeleton-art" />
+          </section>
+          <div className="stat-grid overview-skeleton-stats">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="stat-card overview-skeleton-stat" key={index}>
+                <Skeleton className="skeleton-line skeleton-line-short" />
+                <Skeleton className="skeleton-line skeleton-line-heading" />
+                <Skeleton className="skeleton-line skeleton-line-wide" />
+              </div>
+            ))}
+          </div>
+          <section className="surface-card overview-skeleton-activity">
+            <Skeleton className="skeleton-line skeleton-line-heading" />
+            <div>{Array.from({ length: 4 }, (_, index) => <Skeleton className="skeleton-line skeleton-line-wide" key={index} />)}</div>
+          </section>
+          <div className="overview-grid">
+            <section className="surface-card overview-skeleton-card">
+              <Skeleton className="skeleton-line skeleton-line-heading" />
+              {Array.from({ length: 3 }, (_, index) => <Skeleton className="skeleton-line skeleton-line-wide" key={index} />)}
+            </section>
+            <section className="surface-card overview-skeleton-card">
+              <Skeleton className="skeleton-line skeleton-line-heading" />
+              {Array.from({ length: 3 }, (_, index) => <Skeleton className="skeleton-line skeleton-line-wide" key={index} />)}
+            </section>
+          </div>
+        </div>
+      ) : (
+      <>
       <section className="welcome-banner">
         <div className="welcome-copy">
           <span className="welcome-date"><span aria-hidden="true" />{t('BUGUN')} · {today}</span>
@@ -99,6 +137,8 @@ function OverviewPage({ user, data, stats, onNavigate, language = 'uz' }) {
           <span className="eyebrow">{t('DIQQATNI JAMLANG')}</span><span className="promo-icon"><i className="ph ph-hourglass-medium" /></span><h3>{t('Bir vazifa.')}<br />{t('To‘liq diqqat.')}</h3><p>{t('Qisqa fokus sessiyasini boshlang va unumdorligingizni oshiring.')}</p><button className="button button-primary" onClick={() => onNavigate('focus')}>{t('Fokusni boshlash')} <i className="ph ph-arrow-right" /></button>
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }

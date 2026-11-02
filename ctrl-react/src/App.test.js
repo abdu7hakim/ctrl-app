@@ -8,11 +8,10 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import AuthScreen from './components/auth/AuthScreen';
 import App from './App';
 import TodoPage from './components/todo/TodoPage';
-import { createProfileImageDataUrl, profileImageStorageKey } from './utils/profileImage';
+import { avatarOptions } from './utils/avatars';
 import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
 import { colorThemes } from './utils/themes';
 import { getTodoDeadline, isTodoOverdue, isTodoUrgent } from './utils/todoDeadlines';
@@ -20,15 +19,9 @@ import { createFocusMusic, focusMusicOptions } from './utils/focusMusic';
 
 const originalAudioContext = window.AudioContext;
 
-jest.mock('./utils/profileImage', () => ({
-  ...jest.requireActual('./utils/profileImage'),
-  createProfileImageDataUrl: jest.fn(),
-}));
-
 jest.mock('./firebase', () => ({
   auth: { currentUser: { uid: 'user-1', email: 'aziza@example.com' } },
   db: {},
-  storage: {},
 }));
 
 jest.mock('firebase/auth', () => ({
@@ -51,13 +44,6 @@ jest.mock('firebase/firestore', () => ({
   serverTimestamp: jest.fn(() => 'server-timestamp'),
   setDoc: jest.fn().mockResolvedValue(),
   updateDoc: jest.fn().mockResolvedValue(),
-}));
-
-jest.mock('firebase/storage', () => ({
-  deleteObject: jest.fn().mockResolvedValue(),
-  getDownloadURL: jest.fn().mockResolvedValue('https://storage.example.com/profile.jpg'),
-  ref: jest.fn((_storage, path) => ({ path })),
-  uploadString: jest.fn().mockImplementation((photoRef) => Promise.resolve({ ref: photoRef })),
 }));
 
 import { onAuthStateChanged } from 'firebase/auth';
@@ -85,11 +71,6 @@ beforeEach(() => {
   increment.mockImplementation((amount) => ({ increment: amount }));
   serverTimestamp.mockReturnValue('server-timestamp');
   updateDoc.mockResolvedValue();
-  deleteObject.mockResolvedValue();
-  getDownloadURL.mockResolvedValue('https://storage.example.com/profile.jpg');
-  ref.mockImplementation((_storage, path) => ({ path }));
-  uploadString.mockImplementation((photoRef) => Promise.resolve({ ref: photoRef }));
-  createProfileImageDataUrl.mockResolvedValue('data:image/jpeg;base64,local-avatar');
   reauthenticateWithCredential.mockResolvedValue();
   updatePassword.mockResolvedValue();
   setDoc.mockResolvedValue();
@@ -114,7 +95,27 @@ afterEach(() => {
 async function openPage(name) {
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  const page = {
+    'Kun tartibi': 'routine',
+    Vazifalar: 'todo',
+    Odatlar: 'habits',
+    Profil: 'profile',
+    Aloqa: 'contact',
+  }[name];
   fireEvent.click(within(navigation).getByRole('button', { name: new RegExp(name, 'i') }));
+  await waitFor(() => expect(document.querySelector(`[data-page-transition="${page}"]`)).toBeInTheDocument());
+}
+
+async function navigateToPage(navigation, label, page) {
+  const button = page === 'settings'
+    ? screen.getByRole('button', { name: new RegExp(label, 'i') })
+    : within(navigation).getByRole('button', { name: new RegExp(label, 'i') });
+  fireEvent.click(button);
+  await waitFor(() => {
+    const pageTransition = document.querySelector(`[data-page-transition="${page}"]`);
+    expect(pageTransition).toBeInTheDocument();
+    if (page === 'focus') expect(pageTransition).toHaveStyle({ display: 'block' });
+  });
 }
 
 test('sign-up writes the profile and default app data to the new user document', async () => {
@@ -175,8 +176,68 @@ test('dashboard shows the formatted date in its banner without a duplicate heade
   render(<App />);
   await screen.findByRole('navigation', { name: 'Asosiy menyu' });
 
-  expect(screen.getByText(/^BUGUN · [A-Z][a-z]{2} \d{1,2}, \d{4}$/)).toBeInTheDocument();
+  expect(await screen.findByText(/^BUGUN · [A-Z][a-z]{2} \d{1,2}, \d{4}$/)).toBeInTheDocument();
   expect(document.querySelector('.topbar-date')).not.toBeInTheDocument();
+});
+
+test('mobile bottom navigation links the five main pages and marks the active page', async () => {
+  render(<App />);
+
+  const mobileNavigation = await screen.findByRole('navigation', { name: 'Mobil navigatsiya' });
+  expect(mobileNavigation.querySelectorAll('button')).toHaveLength(5);
+  expect(within(mobileNavigation).getByRole('button', { name: 'Umumiy' })).toHaveAttribute('aria-current', 'page');
+  expect(within(mobileNavigation).getByRole('button', { name: 'Diqqat vaqti' })).toBeInTheDocument();
+  expect(within(mobileNavigation).getByRole('button', { name: 'Vazifalar' })).toBeInTheDocument();
+  expect(within(mobileNavigation).getByRole('button', { name: 'Odatlar' })).toBeInTheDocument();
+  expect(within(mobileNavigation).getByRole('button', { name: 'Reyting' })).toBeInTheDocument();
+
+  fireEvent.click(within(mobileNavigation).getByRole('button', { name: 'Odatlar' }));
+  await waitFor(() => {
+    expect(within(mobileNavigation).getByRole('button', { name: 'Odatlar' })).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+test('shows loading skeletons on dashboard, todo, and habits until Firebase data arrives', async () => {
+  let resolveSnapshot;
+  getDoc.mockReturnValue(new Promise((resolve) => { resolveSnapshot = resolve; }));
+  render(<App />);
+
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  expect(screen.getByRole('status', { name: 'Dashboard ma’lumotlari yuklanmoqda' })).toBeInTheDocument();
+  expect(document.querySelectorAll('.overview-skeleton-stat')).toHaveLength(4);
+
+  await navigateToPage(navigation, 'Vazifalar', 'todo');
+  expect(screen.getByRole('status', { name: 'Vazifalar yuklanmoqda' })).toBeInTheDocument();
+  expect(document.querySelectorAll('.todo-skeleton-row')).toHaveLength(4);
+
+  await navigateToPage(navigation, 'Odatlar', 'habits');
+  expect(screen.getByRole('status', { name: 'Odatlar yuklanmoqda' })).toBeInTheDocument();
+  expect(document.querySelectorAll('.habit-skeleton-row')).toHaveLength(4);
+
+  await act(async () => {
+    resolveSnapshot({
+      exists: () => true,
+      data: () => ({
+        ...storedData,
+        todos: [{ id: 'loaded-todo', title: 'Loaded todo', status: 'open' }],
+        habits: [{
+          id: 'loaded-habit',
+          name: 'Loaded habit',
+          frequency: [0, 1, 2, 3, 4, 5, 6],
+          completions: {},
+        }],
+      }),
+    });
+  });
+
+  expect(await screen.findByText('Loaded habit')).toBeInTheDocument();
+  expect(document.querySelector('.page-content')).toHaveClass('page-content-loaded');
+  expect(screen.queryByRole('status', { name: 'Odatlar yuklanmoqda' })).not.toBeInTheDocument();
+
+  await navigateToPage(navigation, 'Vazifalar', 'todo');
+  expect(await screen.findByRole('heading', { name: 'Loaded todo' })).toBeInTheDocument();
+  await navigateToPage(navigation, 'Umumiy', 'dashboard');
+  expect(await screen.findByText(/^BUGUN · [A-Z][a-z]{2} \d{1,2}, \d{4}$/)).toBeInTheDocument();
 });
 
 test('saves daily routine changes to the signed-in user document', async () => {
@@ -327,7 +388,7 @@ test('task play button starts the task-specific focus timer and opens focus page
   });
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(within(navigation).getByRole('button', { name: /vazifalar/i }));
+  await navigateToPage(navigation, 'vazifalar', 'todo');
 
   fireEvent.click(screen.getByRole('button', { name: 'Hisobot yozish uchun diqqat vaqtini boshlash' }));
 
@@ -439,97 +500,42 @@ test('password change reauthenticates and validates password confirmation', asyn
   expect(updatePassword).toHaveBeenCalledTimes(1);
 });
 
-test('profile image upload saves a resized image to Firebase Storage and the user document', async () => {
-  await openPage('Profil');
-  const uploadInput = screen.getByLabelText('Profil rasmini yuklash');
-  const image = new File(['profile image'], 'profile.png', { type: 'image/png' });
-  fireEvent.change(uploadInput, { target: { files: [image] } });
+test('profile avatar can be selected and is restored from local storage after reload', async () => {
+  window.localStorage.setItem('userAvatar', 'legacy-avatar-url');
+  const { unmount } = render(<App />);
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  const profileButton = screen.getByRole('button', { name: 'Profilni ochish' });
+  expect(profileButton.querySelector('.profile-chip-initials')).toHaveTextContent('AA');
+  expect(window.localStorage.getItem('userAvatar')).toBeNull();
+  fireEvent.click(within(navigation).getByRole('button', { name: /Profil/i }));
+  await waitFor(() => expect(document.querySelector('[data-page-transition="profile"]')).toBeInTheDocument());
+  const profileContent = within(document.querySelector('[data-page-transition="profile"]'));
+  expect(profileContent.getByLabelText('Aziza profil avatari')).toHaveTextContent('AA');
+  expect(screen.queryByLabelText('Profil rasmini yuklash')).not.toBeInTheDocument();
 
-  expect(await screen.findByAltText('Aziza profil rasmi')).toBeInTheDocument();
-  expect(createProfileImageDataUrl).toHaveBeenCalledWith(image);
-  expect(uploadString).toHaveBeenCalledWith(
-    expect.objectContaining({ path: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/) }),
-    'data:image/jpeg;base64,local-avatar',
-    'data_url',
-  );
-  expect(getDownloadURL).toHaveBeenCalled();
-  expect(updateDoc).toHaveBeenCalledWith(
-    { name: 'users', id: 'user-1' },
-    expect.objectContaining({
-      photoURL: 'https://storage.example.com/profile.jpg',
-      photoPath: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/),
-    }),
-  );
-  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBeNull();
-});
+  fireEvent.click(screen.getByRole('button', { name: 'Avatarni o‘zgartirish' }));
+  const picker = await screen.findByRole('dialog', { name: 'Avatarni tanlang' });
+  expect(within(picker).getAllByRole('button', { name: /^Avatar / })).toHaveLength(avatarOptions.length);
+  const selectedAvatar = avatarOptions[11];
+  fireEvent.click(within(picker).getByRole('button', { name: 'Avatar 12' }));
 
-test('existing local profile images are migrated to Firebase when loading the account', async () => {
-  window.localStorage.setItem('ctrl-profile-image-user-1', 'data:image/jpeg;base64,saved-avatar');
-
-  await openPage('Profil');
-
-  expect(await screen.findByAltText('Aziza profil rasmi')).toHaveAttribute(
+  expect(window.localStorage.getItem('userAvatar')).toBe(selectedAvatar.path);
+  expect(profileContent.getByRole('img', { name: 'Aziza profil avatari' })).toHaveAttribute(
     'src',
-    'https://storage.example.com/profile.jpg',
+    `${process.env.PUBLIC_URL}${selectedAvatar.path}`,
   );
-  expect(uploadString).toHaveBeenCalledWith(
-    expect.objectContaining({ path: expect.stringMatching(/^users\/user-1\/profile\/.+\.jpg$/) }),
-    'data:image/jpeg;base64,saved-avatar',
-    'data_url',
-  );
-  expect(window.localStorage.getItem('ctrl-profile-image-user-1')).toBeNull();
-});
-
-test('a pending profile image migration does not block loading the account', async () => {
-  window.localStorage.setItem('ctrl-profile-image-user-1', 'data:image/jpeg;base64,saved-avatar');
-  uploadString.mockReturnValue(new Promise(() => {}));
-
-  render(<App />);
-
-  expect(await screen.findByRole('navigation', { name: 'Asosiy menyu' })).toBeInTheDocument();
-});
-
-test('profile image is restored from Firebase when no local image exists', async () => {
-  getDoc.mockResolvedValue({
-    exists: () => true,
-    data: () => ({ ...storedData, photoURL: 'https://storage.example.com/previous-avatar' }),
-  });
-  onAuthStateChanged.mockImplementation((_auth, callback) => {
-    callback({
-      uid: 'user-1',
-      email: 'aziza@example.com',
-      displayName: 'Aziza Aliyeva',
-      photoURL: 'https://storage.example.com/previous-auth-avatar',
-    });
-    return jest.fn();
-  });
-
-  await openPage('Profil');
-
-  expect(await screen.findByAltText('Aziza profil rasmi')).toHaveAttribute(
+  expect(profileButton.querySelector('.profile-chip-avatar')).toHaveAttribute(
     'src',
-    'https://storage.example.com/previous-avatar',
+    `${process.env.PUBLIC_URL}${selectedAvatar.path}`,
   );
-});
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-test('profile image upload rejects unsupported image types', async () => {
+  unmount();
   await openPage('Profil');
-  const uploadInput = screen.getByLabelText('Profil rasmini yuklash');
-  fireEvent.change(uploadInput, {
-    target: { files: [new File(['not an image'], 'profile.gif', { type: 'image/gif' })] },
-  });
-
-  expect(await screen.findByRole('alert')).toHaveTextContent('Rasm JPG, PNG yoki WebP formatida bo‘lishi kerak.');
-  expect(createProfileImageDataUrl).not.toHaveBeenCalled();
-});
-
-test('profile image upload rejects files larger than 5 MB', async () => {
-  await openPage('Profil');
-  const image = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'profile.png', { type: 'image/png' });
-  fireEvent.change(screen.getByLabelText('Profil rasmini yuklash'), { target: { files: [image] } });
-
-  expect(await screen.findByRole('alert')).toHaveTextContent('Rasm hajmi 5 MB dan oshmasligi kerak.');
-  expect(createProfileImageDataUrl).not.toHaveBeenCalled();
+  expect(window.localStorage.getItem('userAvatar')).toBe(selectedAvatar.path);
+  expect(within(document.querySelector('[data-page-transition="profile"]')).getByRole('img', {
+    name: 'Aziza profil avatari',
+  })).toHaveAttribute('src', `${process.env.PUBLIC_URL}${selectedAvatar.path}`);
 });
 
 test('dark mode preference is saved to the signed-in user document', async () => {
@@ -547,7 +553,7 @@ test('dark mode preference is saved to the signed-in user document', async () =>
 test('settings page can update the saved dark mode preference', async () => {
   render(<App />);
   await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+  await navigateToPage(screen.getByRole('navigation', { name: 'Asosiy menyu' }), 'Sozlamalar', 'settings');
   const toggle = await screen.findByRole('switch', { name: 'Tungi rejim' });
   expect(toggle).toHaveAttribute('aria-checked', 'false');
   fireEvent.click(toggle);
@@ -561,8 +567,8 @@ test('settings page can update the saved dark mode preference', async () => {
 
 test('settings page applies and saves a selected color theme', async () => {
   render(<App />);
-  await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  await navigateToPage(navigation, 'Sozlamalar', 'settings');
   expect(colorThemes).toHaveLength(7);
   fireEvent.click(await screen.findByRole('button', { name: 'Ko‘k rang mavzusi' }));
 
@@ -579,18 +585,10 @@ test('settings page applies and saves a selected color theme', async () => {
 
 test('settings reset requires confirmation and only keeps account identity fields', async () => {
   window.localStorage.setItem('ctrl-app-language', 'en');
-  window.localStorage.setItem(profileImageStorageKey('user-1'), 'data:image/jpeg;base64,avatar');
-  getDoc.mockResolvedValue({
-    exists: () => true,
-    data: () => ({
-      ...storedData,
-      photoURL: 'https://storage.example.com/avatar.jpg',
-      photoPath: 'users/user-1/profile/avatar.jpg',
-    }),
-  });
+  window.localStorage.setItem('userAvatar', avatarOptions[2].path);
   render(<App />);
   await screen.findByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  await navigateToPage(screen.getByRole('navigation', { name: 'Main menu' }), 'Settings', 'settings');
 
   fireEvent.click(await screen.findByRole('button', { name: 'Delete my data' }));
   expect(screen.getByText('This cannot be undone. Are you sure?')).toBeInTheDocument();
@@ -603,12 +601,11 @@ test('settings reset requires confirmation and only keeps account identity field
     { name: 'users', id: 'user-1' },
     { firstName: 'Aziza', lastName: 'Aliyeva', email: 'aziza@example.com' },
   ));
-  expect(deleteObject).toHaveBeenCalledWith({ path: 'users/user-1/profile/avatar.jpg' });
   expect(await screen.findByText('Ma’lumotlaringiz o‘chirildi. Ism, familiya, email va parolingiz saqlab qolindi.', {
     selector: '.settings-reset-success',
   })).toBeInTheDocument();
   expect(window.localStorage.getItem('ctrl-app-language')).toBeNull();
-  expect(window.localStorage.getItem(profileImageStorageKey('user-1'))).toBeNull();
+  expect(window.localStorage.getItem('userAvatar')).toBeNull();
   expect(document.documentElement).toHaveAttribute('lang', 'uz');
   expect(updatePassword).not.toHaveBeenCalled();
 });
@@ -617,7 +614,7 @@ test('settings reset displays save errors and keeps the confirmation open', asyn
   setDoc.mockRejectedValueOnce(new Error('Network unavailable'));
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+  await navigateToPage(navigation, 'Sozlamalar', 'settings');
 
   fireEvent.click(await screen.findByRole('button', { name: 'Ma’lumotlarni o‘chirish' }));
   fireEvent.click(screen.getByRole('button', { name: 'Ha, hamma ma’lumotni o‘chirish' }));
@@ -652,7 +649,7 @@ test('contact messages are added to the messages collection with the authenticat
 test('a completed focus session uses Firestore atomic increments', async () => {
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(within(navigation).getByRole('button', { name: /diqqat vaqti/i }));
+  await navigateToPage(navigation, 'diqqat vaqti', 'focus');
   window.AudioContext = jest.fn(() => ({
     state: 'running',
     currentTime: 0,
@@ -710,7 +707,7 @@ test('focus task picker accumulates completed focus minutes on the selected task
   }));
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(within(navigation).getByRole('button', { name: /diqqat vaqti/i }));
+  await navigateToPage(navigation, 'diqqat vaqti', 'focus');
   fireEvent.change(screen.getByLabelText('Fokus vazifasi'), { target: { value: 'todo-focus' } });
 
   expect(screen.getByText('Kitob o‘qish', { selector: 'strong' })).toBeInTheDocument();
@@ -737,7 +734,7 @@ test('resuming a paused focus session preserves its remaining time and records o
   });
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(within(navigation).getByRole('button', { name: /diqqat vaqti/i }));
+  await navigateToPage(navigation, 'diqqat vaqti', 'focus');
   window.AudioContext = jest.fn(() => ({
     state: 'running',
     currentTime: 0,
@@ -779,7 +776,7 @@ test('focus timer continues while navigating to another page and back', async ()
   });
   render(<App />);
   const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(within(navigation).getByRole('button', { name: /diqqat vaqti/i }));
+  await navigateToPage(navigation, 'diqqat vaqti', 'focus');
   window.AudioContext = jest.fn(() => ({
     state: 'running',
     currentTime: 0,
@@ -957,8 +954,8 @@ test('changing the language in settings updates the whole app and persists the p
   descriptionMeta.name = 'description';
   document.head.appendChild(descriptionMeta);
   render(<App />);
-  await screen.findByRole('navigation', { name: 'Asosiy menyu' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sozlamalar' }));
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+  await navigateToPage(navigation, 'Sozlamalar', 'settings');
 
   fireEvent.change(await screen.findByRole('combobox', { name: 'Ilova tili' }), { target: { value: 'en' } });
   await waitFor(() => expect(updateDoc).toHaveBeenCalledWith(

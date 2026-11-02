@@ -4,6 +4,16 @@ import OverviewPage from './OverviewPage';
 const data = { todos: [], habits: [], routine: {} };
 const stats = { done: 0, pending: 0, completedHabits: 0, focusMinutes: 0 };
 
+test('shows dashboard statistic skeletons while data is loading', () => {
+  const { container } = render(
+    <OverviewPage user={{ firstName: 'Aziza' }} data={data} stats={stats} onNavigate={jest.fn()} isLoading />,
+  );
+
+  expect(screen.getByRole('status', { name: 'Dashboard ma’lumotlari yuklanmoqda' })).toBeInTheDocument();
+  expect(container.querySelectorAll('.overview-skeleton-stat')).toHaveLength(4);
+  expect(container.querySelector('.page-content')).toHaveClass('page-content-loading');
+});
+
 test('uses the statistic cards for navigation instead of the quick access section', () => {
   const onNavigate = jest.fn();
   render(<OverviewPage user={{ firstName: 'Aziza' }} data={data} stats={stats} onNavigate={onNavigate} />);

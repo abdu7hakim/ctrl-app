@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import AuthScreen from './components/auth/AuthScreen';
 import DashboardLayout from './components/layout/DashboardLayout';
 import OverviewPage from './components/dashboard/OverviewPage';
@@ -12,12 +13,11 @@ import ContactPage from './components/contact/ContactPage';
 import SettingsPage from './components/settings/SettingsPage';
 import { defaultThemeId, getColorTheme } from './utils/themes';
 import { isTodoOverdue } from './utils/todoDeadlines';
-import { createProfileImagePath, getStoredProfileImage, profileImageStorageKey } from './utils/profileImage';
+import { clearStoredAvatar, getStoredAvatar } from './utils/avatars';
 import { getStoredLanguage, saveStoredLanguage, translate } from './utils/language';
-import { auth, db, storage } from './firebase';
+import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import './App.css';
 
 const initialData = {
@@ -49,6 +49,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [language, setLanguageState] = useState(getStoredLanguage);
   const [page, setPage] = useState('dashboard');
+  const [focusPageVisible, setFocusPageVisible] = useState(false);
   const [data, setData] = useState(initialData);
   const [darkMode, setDarkMode] = useState(false);
   const [colorTheme, setColorTheme] = useState(defaultThemeId);
@@ -63,6 +64,10 @@ function App() {
   const latestData = useRef(data);
   const expiryErrorKey = useRef('');
   const focusTaskStarter = useRef(null);
+
+  useEffect(() => {
+    if (page === 'focus') setFocusPageVisible(true);
+  }, [page]);
 
   const registerFocusTaskStarter = useCallback((starter) => {
     focusTaskStarter.current = starter;
@@ -111,13 +116,11 @@ function App() {
         return;
       }
 
-      const localPhotoURL = getStoredProfileImage(firebaseUser.uid);
       const identity = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         ...getNameParts(firebaseUser.displayName, firebaseUser.email),
-        photoURL: localPhotoURL,
-        photoPath: '',
+        avatar: getStoredAvatar(),
       };
       setUser(identity);
       setAuthError('');
@@ -136,8 +139,6 @@ function App() {
             email: identity.email,
           };
           const storedData = snapshot.exists() ? snapshot.data() : {};
-          let photoURL = typeof storedData.photoURL === 'string' ? storedData.photoURL : '';
-          let photoPath = typeof storedData.photoPath === 'string' ? storedData.photoPath : '';
           const nextData = {
             ...initialData,
             ...storedData,
@@ -149,8 +150,6 @@ function App() {
             routineBadges: Array.isArray(storedData.routineBadges) ? storedData.routineBadges : [],
             darkMode: typeof storedData.darkMode === 'boolean' ? storedData.darkMode : false,
             colorTheme: getColorTheme(storedData.colorTheme).id,
-            photoURL: photoURL || localPhotoURL,
-            photoPath,
             focusDurationMinutes: Number.isSafeInteger(storedData.focusDurationMinutes)
               && storedData.focusDurationMinutes > 0
               && storedData.focusDurationMinutes <= Math.floor(Number.MAX_SAFE_INTEGER / 60)
@@ -189,8 +188,6 @@ function App() {
               ...identity,
               firstName: storedData.firstName || identity.firstName,
               lastName: storedData.lastName || identity.lastName,
-              photoURL: nextData.photoURL,
-              photoPath: nextData.photoPath,
             });
           }
           if (active && generation === authGeneration.current) setData(nextData);
@@ -228,53 +225,6 @@ function App() {
       unsubscribe();
     };
   }, [reloadKey]);
-
-  useEffect(() => {
-    if (!user || dataLoading || !user.photoURL?.startsWith('data:image/')) return undefined;
-    let active = true;
-    let uploadedRef;
-
-    const migrateProfileImage = async () => {
-      try {
-        const photoPath = createProfileImagePath(user.uid);
-        uploadedRef = ref(storage, photoPath);
-        const uploadedPhoto = await uploadString(uploadedRef, user.photoURL, 'data_url');
-        const photoURL = await getDownloadURL(uploadedPhoto.ref);
-        if (!active || auth.currentUser?.uid !== user.uid) {
-          await deleteObject(uploadedRef);
-          return;
-        }
-
-        await setDoc(doc(db, 'users', user.uid), { photoURL, photoPath }, { merge: true });
-        if (!active) return;
-        setUser((currentUser) => (
-          currentUser?.uid === user.uid ? { ...currentUser, photoURL, photoPath } : currentUser
-        ));
-        try {
-          window.localStorage.removeItem(profileImageStorageKey(user.uid));
-        } catch (storageError) {
-          console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
-        }
-      } catch (migrationError) {
-        if (uploadedRef) {
-          try {
-            await deleteObject(uploadedRef);
-          } catch (cleanupError) {
-            if (cleanupError.code !== 'storage/object-not-found') {
-              console.error('Ko‘chirilmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
-            }
-          }
-        }
-        console.error('Eski profil rasmini Firebase Storage’ga ko‘chirishda xatolik:', migrationError);
-        if (active) setNotice('Eski profil rasmini hisobingizga saqlab bo‘lmadi. Profil sahifasidan qayta yuklang.');
-      }
-    };
-
-    migrateProfileImage();
-    return () => {
-      active = false;
-    };
-  }, [dataLoading, user]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -352,14 +302,6 @@ function App() {
       throw new Error('Ma’lumotlarni o‘chirish uchun hisobingizga kiring.');
     }
 
-    if (user.photoPath) {
-      try {
-        await deleteObject(ref(storage, user.photoPath));
-      } catch (error) {
-        if (error.code !== 'storage/object-not-found') throw error;
-      }
-    }
-
     await setDoc(doc(db, 'users', user.uid), {
       firstName: user.firstName || '',
       lastName: user.lastName || '',
@@ -371,13 +313,13 @@ function App() {
     setDarkMode(initialData.darkMode);
     setColorTheme(initialData.colorTheme);
     setLanguageState(initialData.language);
-    setUser((currentUser) => ({ ...currentUser, photoURL: '', photoPath: '' }));
+    setUser((currentUser) => ({ ...currentUser, avatar: null }));
 
     const localStorageErrors = [];
     try {
-      window.localStorage.removeItem(profileImageStorageKey(user.uid));
+      clearStoredAvatar();
     } catch (error) {
-      console.error('Profil rasmini brauzer xotirasidan o‘chirishda xatolik:', error);
+      console.error('Tanlangan avatarni brauzer xotirasidan o‘chirishda xatolik:', error);
       localStorageErrors.push(error);
     }
     try {
@@ -540,7 +482,7 @@ function App() {
       </>
     );
   }
-  if (dataLoading) {
+  if (dataLoading && !['dashboard', 'todo', 'habits'].includes(page)) {
     return <div className="app-loading" role="status">{translate('Ma’lumotlar yuklanmoqda...', language)}</div>;
   }
   if (dataError) {
@@ -554,10 +496,10 @@ function App() {
   }
 
   const pages = {
-    dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} language={language} />,
+    dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} isLoading={dataLoading} language={language} />,
     leaderboard: <LeaderboardPage />,
-    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} language={language} />,
-    habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} language={language} />,
+    todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} isLoading={dataLoading} language={language} />,
+    habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} isLoading={dataLoading} language={language} />,
     routine: <RoutinePage routines={data.routine} routineBadges={data.routineBadges} onSave={saveRoutine} language={language} />,
     profile: <ProfilePage user={user} onSave={(updatedUser) => {
       setUser(updatedUser);
@@ -589,8 +531,32 @@ function App() {
         language={language}
         onChangeLanguage={changeLanguage}
       >
-        {page !== 'focus' && (pages[page] || pages.dashboard)}
-        <div hidden={page !== 'focus'}>
+        <AnimatePresence mode="wait">
+          {page !== 'focus' && (
+            <motion.div
+              key={`/${page}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              data-page-transition={page}
+            >
+              {pages[page] || pages.dashboard}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.div
+          animate={page === 'focus'
+            ? { opacity: 1, y: 0 }
+            : { opacity: 0, y: -20 }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          initial={false}
+          data-page-transition="focus"
+          onAnimationComplete={() => {
+            if (page !== 'focus') setFocusPageVisible(false);
+          }}
+          style={{ display: focusPageVisible || page === 'focus' ? 'block' : 'none' }}
+        >
           <FocusPage
             todos={data.todos}
             onSessionComplete={saveFocusSession}
@@ -603,7 +569,7 @@ function App() {
             onRegisterTaskStarter={registerFocusTaskStarter}
             language={language}
           />
-        </div>
+        </motion.div>
       </DashboardLayout>
       {notice && <div className="toast" role="status">{translate(notice, language)}</div>}
     </>

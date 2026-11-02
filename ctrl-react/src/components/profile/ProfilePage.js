@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, X } from 'lucide-react';
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -6,13 +8,9 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
-import { auth, db, storage } from '../../firebase';
-import { createProfileImageDataUrl, createProfileImagePath, profileImageStorageKey } from '../../utils/profileImage';
+import { auth, db } from '../../firebase';
+import { avatarOptions, getAvatarInitials, saveStoredAvatar } from '../../utils/avatars';
 import { translate } from '../../utils/language';
-
-const maxProfileImageSize = 5 * 1024 * 1024;
-const allowedProfileImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
 function ProfilePage({ user, onSave, language = 'uz' }) {
   const t = (text) => translate(text, language);
@@ -20,7 +18,8 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
   const [lastName, setLastName] = useState(user.lastName);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(user.avatar);
   const [error, setError] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -32,6 +31,7 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
   useEffect(() => {
     setFirstName(user.firstName);
     setLastName(user.lastName);
+    setSelectedAvatar(user.avatar);
   }, [user]);
 
   const submit = async (event) => {
@@ -66,74 +66,29 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
     }
   };
 
-  const uploadProfileImage = async (event) => {
-    const image = event.target.files?.[0];
-    event.target.value = '';
-    if (!image) return;
-
-    if (!allowedProfileImageTypes.includes(image.type)) {
-      setError('Rasm JPG, PNG yoki WebP formatida bo‘lishi kerak.');
-      return;
-    }
-    if (image.size > maxProfileImageSize) {
-      setError('Rasm hajmi 5 MB dan oshmasligi kerak.');
-      return;
-    }
-
+  const selectAvatar = (avatarPath) => {
     setError('');
     setSaved(false);
-    setUploadingImage(true);
-    const firebaseUser = auth.currentUser;
-
     try {
-      if (!firebaseUser || firebaseUser.uid !== user.uid) {
-        throw new Error('Rasm yuklash uchun hisobingizga qayta kiring.');
-      }
-
-      const photoDataUrl = await createProfileImageDataUrl(image);
-      const photoPath = createProfileImagePath(user.uid);
-      const photoRef = ref(storage, photoPath);
-      let uploadCompleted = false;
-      try {
-        const uploadedPhoto = await uploadString(photoRef, photoDataUrl, 'data_url');
-        uploadCompleted = true;
-        const photoURL = await getDownloadURL(uploadedPhoto.ref);
-        await updateDoc(doc(db, 'users', user.uid), { photoURL, photoPath });
-        onSave({ ...user, photoURL, photoPath });
-        setSaved(true);
-      } catch (uploadError) {
-        if (uploadCompleted) {
-          try {
-            await deleteObject(photoRef);
-          } catch (cleanupError) {
-            console.error('Yuklanmagan profil rasmini Firebase Storage’dan tozalashda xatolik:', cleanupError);
-          }
-        }
-        throw uploadError;
-      }
-
-      if (user.photoPath) {
-        try {
-          await deleteObject(ref(storage, user.photoPath));
-        } catch (cleanupError) {
-          if (cleanupError.code !== 'storage/object-not-found') {
-            console.error('Eski profil rasmini Firebase Storage’dan o‘chirishda xatolik:', cleanupError);
-            setError('Yangi rasm saqlandi, ammo eski rasmni o‘chirib bo‘lmadi.');
-          }
-        }
-      }
-      try {
-        window.localStorage.removeItem(profileImageStorageKey(user.uid));
-      } catch (storageError) {
-        console.error('Eski profil rasmini brauzer xotirasidan o‘chirishda xatolik:', storageError);
-      }
-    } catch (uploadError) {
-      console.error('Profil rasmini yuklashda xatolik:', uploadError);
-      setError('Rasmni Firebase’ga yuklab bo‘lmadi. Qayta urinib ko‘ring.');
-    } finally {
-      setUploadingImage(false);
+      saveStoredAvatar(avatarPath);
+      setSelectedAvatar(avatarPath);
+      onSave({ ...user, avatar: avatarPath });
+      setSaved(true);
+      setAvatarPickerOpen(false);
+    } catch (avatarError) {
+      console.error('Tanlangan avatarni saqlashda xatolik:', avatarError);
+      setError('Avatarni saqlab bo‘lmadi. Qayta urinib ko‘ring.');
     }
   };
+
+  useEffect(() => {
+    if (!avatarPickerOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setAvatarPickerOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [avatarPickerOpen]);
 
   const getSecurityErrorMessage = (securitySaveError, fallback) => {
     if (['auth/wrong-password', 'auth/invalid-credential'].includes(securitySaveError.code)) {
@@ -185,20 +140,12 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
       <section className="surface-card profile-card">
         <div className="profile-summary">
           <div className="profile-avatar-control">
-            {user.photoURL
-              ? <img className="avatar avatar-large profile-avatar-image" src={user.photoURL} alt={`${user.firstName} ${t('profil rasmi')}`} />
-              : <span className="avatar avatar-large">{`${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()}</span>}
-            <label className={`profile-avatar-upload ${uploadingImage ? 'profile-avatar-uploading' : ''}`}>
-              <i className={`ph ${uploadingImage ? 'ph-spinner' : 'ph-camera'}`} aria-hidden="true" />
-              <span>{t(uploadingImage ? 'Yuklanmoqda...' : user.photoURL ? 'Rasmni almashtirish' : 'Rasm yuklash')}</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                aria-label={t('Profil rasmini yuklash')}
-                onChange={uploadProfileImage}
-                disabled={uploadingImage || saving}
-              />
-            </label>
+            {selectedAvatar
+              ? <img className="profile-avatar-image" src={`${process.env.PUBLIC_URL}${selectedAvatar}`} alt={`${user.firstName} ${t('profil avatari')}`} />
+              : <span className="profile-avatar-fallback profile-avatar-fallback-large" aria-label={`${user.firstName} ${t('profil avatari')}`}>{getAvatarInitials(user)}</span>}
+            <button type="button" className="profile-avatar-change" onClick={() => setAvatarPickerOpen(true)}>
+              {t('Avatarni o‘zgartirish')}
+            </button>
           </div>
           <div><h3>{user.firstName} {user.lastName}</h3><p>{user.email}</p></div>
           <span className="account-badge"><i className="ph ph-check-circle" /> {t('Faol hisob')}</span>
@@ -206,11 +153,64 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
         <form className="profile-form" onSubmit={submit}>
           <div className="form-row"><label>{t('Ism')}<input value={firstName} onChange={(event) => { setFirstName(event.target.value); setSaved(false); }} required maxLength="60" /></label><label>{t('Familiya')}<input value={lastName} onChange={(event) => { setLastName(event.target.value); setSaved(false); }} required maxLength="60" /></label></div>
           <label>{t('E-mail manzil')}<input value={user.email} type="email" readOnly disabled /></label>
-          <p className="profile-image-note">{t('JPG, PNG yoki WebP · 5 MB gacha')}</p>
           {error && <p className="form-error" role="alert">{t(error)}</p>}
           <div className="profile-form-footer">{saved && <span className="success-message" role="status">{t('Saqlandi')}</span>}<button className="button button-primary" disabled={saving}>{t(saving ? 'Saqlanmoqda...' : 'O‘zgarishlarni saqlash')}</button></div>
         </form>
       </section>
+      <AnimatePresence>
+        {avatarPickerOpen && (
+          <motion.div
+            className="avatar-picker-backdrop"
+            role="presentation"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setAvatarPickerOpen(false);
+            }}
+          >
+            <motion.section
+              className="avatar-picker-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="avatar-picker-title"
+              initial={{ opacity: 0, y: 28, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+            >
+              <div className="avatar-picker-heading">
+                <div>
+                  <span className="eyebrow">{t('SHAXSIYLASHTIRISH')}</span>
+                  <h2 id="avatar-picker-title">{t('Avatarni tanlang')}</h2>
+                </div>
+                <button type="button" className="icon-button" aria-label={t('Yopish')} onClick={() => setAvatarPickerOpen(false)}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="avatar-picker-grid">
+                {avatarOptions.map((avatar) => {
+                  const isSelected = selectedAvatar === avatar.path;
+                  return (
+                    <button
+                      className={`avatar-picker-option ${isSelected ? 'avatar-picker-option-selected' : ''}`}
+                      type="button"
+                      key={avatar.id}
+                      aria-label={`${t('Avatar')} ${avatar.name}`}
+                      aria-pressed={isSelected}
+                      onClick={() => selectAvatar(avatar.path)}
+                    >
+                      <img src={`${process.env.PUBLIC_URL}${avatar.path}`} alt="" />
+                      {isSelected && <span className="avatar-picker-check"><Check size={15} aria-hidden="true" /></span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <section className="profile-security">
         <section className="surface-card profile-security-card">
           <div className="section-heading"><div><span className="eyebrow">{t('HISOB XAVFSIZLIGI')}</span><h3>{t('Parolni o‘zgartirish')}</h3></div></div>

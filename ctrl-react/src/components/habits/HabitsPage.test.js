@@ -12,6 +12,14 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+test('shows skeleton rows while habits are loading', () => {
+  const { container } = render(<HabitsPage habits={[]} onChange={jest.fn()} isLoading />);
+
+  expect(screen.getByRole('status', { name: 'Odatlar yuklanmoqda' })).toBeInTheDocument();
+  expect(container.querySelectorAll('.habit-skeleton-row')).toHaveLength(4);
+  expect(container.querySelector('.page-content')).toHaveClass('page-content-loading');
+});
+
 test('shows separate weekly progress and excludes days before a habit was created', () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
   const today = new Date();

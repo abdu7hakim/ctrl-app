@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createId } from '../../utils/helpers';
 import { isTodoUrgent } from '../../utils/todoDeadlines';
 import { translate } from '../../utils/language';
+import Skeleton from '../ui/Skeleton';
 
 const priorities = [
   { value: 'high', label: 'Yuqori' },
@@ -28,7 +29,7 @@ const getQuickDueDates = () => {
   ];
 };
 
-function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
+function TodoPage({ todos, onChange, onStartFocus, isLoading = false, language = 'uz' }) {
   const t = (text) => translate(text, language);
   const translatedPriorities = priorities.map((priority) => ({ ...priority, label: t(priority.label) }));
   const [filter, setFilter] = useState('all');
@@ -134,7 +135,41 @@ function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
   );
 
   return (
-    <div className="page-content">
+    <div className={`page-content ${isLoading ? 'page-content-loading' : 'page-content-loaded'}`}>
+      {isLoading ? (
+        <div className="todo-layout todo-skeleton" role="status" aria-label={t('Vazifalar yuklanmoqda')}>
+          <section className="surface-card todo-list-panel">
+            <div className="todo-toolbar">
+              <div className="todo-skeleton-filters">
+                <Skeleton className="skeleton-filter" />
+                <Skeleton className="skeleton-filter" />
+                <Skeleton className="skeleton-filter" />
+              </div>
+              <Skeleton className="skeleton-search" />
+            </div>
+            <div className="todo-items">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div className="todo-skeleton-row" key={index}>
+                  <Skeleton className="skeleton-circle" />
+                  <div className="todo-skeleton-copy">
+                    <Skeleton className="skeleton-line skeleton-line-title" />
+                    <Skeleton className="skeleton-line skeleton-line-short" />
+                  </div>
+                  <Skeleton className="skeleton-square" />
+                </div>
+              ))}
+            </div>
+          </section>
+          <aside className="surface-card add-task-card todo-skeleton-form">
+            <Skeleton className="skeleton-line skeleton-line-short" />
+            <Skeleton className="skeleton-line skeleton-line-heading" />
+            <Skeleton className="skeleton-line skeleton-line-wide" />
+            <Skeleton className="skeleton-form-field" />
+            <Skeleton className="skeleton-form-field" />
+            <Skeleton className="skeleton-form-button" />
+          </aside>
+        </div>
+      ) : (
       <div className="todo-layout">
         <section className="surface-card todo-list-panel">
           <div className="todo-toolbar"><div className="filter-tabs" role="group" aria-label={t('Vazifalarni saralash')}>{[['all', 'Barchasi'], ['open', 'Ochiq'], ['done', 'Bajarilgan']].map(([value, label]) => <button key={value} className={filter === value ? 'filter-active' : ''} onClick={() => setFilter(value)}>{t(label)}<span>{value === 'all' ? todos.length : todos.filter((todo) => todo.status === value).length}</span></button>)}</div><label className="search-field"><i className="ph ph-magnifying-glass" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Vazifani qidirish')} /></label></div>
@@ -192,6 +227,7 @@ function TodoPage({ todos, onChange, onStartFocus, language = 'uz' }) {
           </form>
         </aside>
       </div>
+      )}
     </div>
   );
 }
