@@ -23,7 +23,6 @@ function LeaderboardPage() {
         <div className="leaderboard-trophy" aria-hidden="true">
           <Trophy size={34} strokeWidth={1.7} />
         </div>
-        <span className="leaderboard-eyebrow">COMING SOON</span>
         <h2 id="leaderboard-heading">Leaderboard is Coming Soon</h2>
         <p className="leaderboard-description">
           We are working hard to bring you a competitive ranking system. Soon you will be able to compete with friends, earn XP, and climb the ranks!
@@ -32,7 +31,6 @@ function LeaderboardPage() {
         <div className="leaderboard-share-grid">
           <div className="leaderboard-invite-panel">
             <span className="leaderboard-share-icon" aria-hidden="true"><Users size={20} /></span>
-            <p>Bring your friends along</p>
             <button className="leaderboard-invite-button" type="button" onClick={copyReferralLink}>
               <span>Invite Friends</span>
               {copyStatus === 'Link copied!' ? <Check size={17} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
@@ -46,7 +44,6 @@ function LeaderboardPage() {
           </div>
         </div>
 
-        <p className="leaderboard-footer">We will notify you when it's ready.</p>
       </section>
     </div>
   );

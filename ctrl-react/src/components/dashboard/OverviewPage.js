@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getDailyMotivation } from '../../utils/motivation';
 import { translate } from '../../utils/language';
 import { getActivityHeatmap } from '../../utils/activityHeatmap';
+import { getDailyMotivation } from '../../utils/motivation';
 import Skeleton from '../ui/Skeleton';
 
 function OverviewPage({ user, data, stats, onNavigate, isLoading = false, language = 'uz' }) {
@@ -11,6 +11,7 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
   const progress = data.habits.length ? Math.round((stats.completedHabits / data.habits.length) * 100) : 0;
   const nextTodos = data.todos.filter((todo) => todo.status === 'open').slice(0, 4);
   const activityHeatmap = getActivityHeatmap(data, currentDate);
+  const motivation = getDailyMotivation(currentDate);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -23,8 +24,6 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
     return () => window.clearInterval(timer);
   }, []);
 
-  const motivation = getDailyMotivation(currentDate);
-
   return (
     <div className={`page-content ${isLoading ? 'page-content-loading' : 'page-content-loaded'}`}>
       {isLoading ? (
@@ -33,10 +32,8 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
             <div>
               <Skeleton className="skeleton-line skeleton-line-short" />
               <Skeleton className="skeleton-line skeleton-line-heading" />
-              <Skeleton className="skeleton-line skeleton-line-wide" />
               <Skeleton className="skeleton-form-button" />
             </div>
-            <Skeleton className="overview-skeleton-art" />
           </section>
           <div className="stat-grid overview-skeleton-stats">
             {Array.from({ length: 4 }, (_, index) => (
@@ -68,7 +65,7 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
         <div className="welcome-copy">
           <span className="welcome-date"><span aria-hidden="true" />{t('BUGUN')} · {today}</span>
           <h2>{t('Salom,')} {user.firstName}! <i className="ph ph-hand-waving wave" aria-hidden="true" /></h2>
-          <p>{t('Bugun maqsadlaringizga yaqinlashish uchun ajoyib kun.')}</p>
+          <p>{t('Kun tartibingiz, odatlaringiz va fokus vaqtingiz — barchasi bir joyda.')}</p>
           <button className="button welcome-button" onClick={() => onNavigate('todo')}>{t('Vazifalarni ko‘rish')} <i className="ph ph-arrow-up-right" /></button>
         </div>
         <div className="welcome-art" aria-hidden="true">
@@ -77,8 +74,8 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
           <div className="welcome-preview">
             <div className="welcome-preview-top"><strong>CTRL App</strong><span><i className="ph ph-sun" /><span className="avatar">A</span></span></div>
             <h3>{t('Diqqat. Erishing. Rivojlaning.')}</h3>
-            <p>{t('Maqsadlaringizga yana bir qadam.')}</p>
-            <div className="welcome-streak"><i className="ph ph-fire" /><strong>12</strong><span>{t('kunlik izchillik')}</span><i className="ph ph-trend-up" /></div>
+            <p>{t('Maqsadlaringiz sari har kuni bir qadam.')}</p>
+            <div className="welcome-streak"><i className="ph ph-fire" /><strong>{progress}%</strong><span>{t('Odatlar')}</span><i className="ph ph-trend-up" /></div>
             <div className="welcome-preview-tasks"><strong>{t('Bugungi vazifalar')}</strong><span><i className="ph ph-circle" /> {t('Muhim ishni rejalashtiring')} <i className="ph ph-arrow-right" /></span></div>
           </div>
           <div className="welcome-chart"><i className="ph ph-chart-bar" /></div>
@@ -93,7 +90,7 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
       </section>
       <section className="surface-card activity-card" aria-labelledby="activity-heading">
         <div className="activity-heading">
-          <div><span className="eyebrow">{t('IZCHILLIK')}</span><h3 id="activity-heading">{t('Faollik')}</h3></div>
+          <div><h3 id="activity-heading">{t('Faollik')}</h3></div>
           <span className="activity-period">{t('Oxirgi 6 oy')}</span>
         </div>
         <div className="activity-chart" role="group" aria-label={t('Oxirgi olti oydagi kundalik faollik xaritasi')}>
@@ -124,17 +121,17 @@ function OverviewPage({ user, data, stats, onNavigate, isLoading = false, langua
           </div>
         </div>
       </section>
-      <aside className="daily-motivation">
+      <aside className="daily-motivation" aria-label={t('BUGUNGI ILHOM')}>
         <span className="tip-icon"><i className="ph ph-sparkle" aria-hidden="true" /></span>
         <div><span className="eyebrow">{t('BUGUNGI ILHOM')}</span><p>{t(motivation)}</p></div>
       </aside>
       <div className="overview-grid">
         <section className="surface-card overview-tasks">
-          <div className="section-heading"><div><span className="eyebrow">{t('REJA')}</span><h3>{t('Bugungi vazifalar')}</h3></div><button className="text-button" onClick={() => onNavigate('todo')}>{t('Barchasi')} <i className="ph ph-arrow-right" /></button></div>
+          <div className="section-heading"><div><h3>{t('Bugungi vazifalar')}</h3></div><button className="text-button" onClick={() => onNavigate('todo')}>{t('Barchasi')} <i className="ph ph-arrow-right" /></button></div>
           {nextTodos.length ? <ul className="overview-list">{nextTodos.map((todo) => <li key={todo.id}><span className="list-dot" /><span>{todo.title}</span>{todo.dueDate && <time>{todo.dueDate}</time>}</li>)}</ul> : <div className="empty-state"><i className="ph ph-check-circle" /><p>{t('Hozircha ochiq vazifa yo‘q.')}</p><button className="text-button" onClick={() => onNavigate('todo')}>{t('Yangi vazifa qo‘shish')}</button></div>}
         </section>
         <section className="surface-card focus-promo">
-          <span className="eyebrow">{t('DIQQATNI JAMLANG')}</span><span className="promo-icon"><i className="ph ph-hourglass-medium" /></span><h3>{t('Bir vazifa.')}<br />{t('To‘liq diqqat.')}</h3><p>{t('Qisqa fokus sessiyasini boshlang va unumdorligingizni oshiring.')}</p><button className="button button-primary" onClick={() => onNavigate('focus')}>{t('Fokusni boshlash')} <i className="ph ph-arrow-right" /></button>
+          <h3>{t('Diqqat vaqti')}</h3><button className="button button-primary" onClick={() => onNavigate('focus')}>{t('Fokusni boshlash')} <i className="ph ph-arrow-right" /></button>
         </section>
       </div>
       </>

@@ -273,8 +273,6 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
                   </span>
                 </button>
                 <div className="habit-details">
-                  {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> {t('Odat shakllandi')}</span>}
-                  {habit.goal && <p><i className="ph ph-target" /> {habit.goal}</p>}
                   <div className="habit-week">
                     <span className="habit-week-count">{t('Hafta')} {habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)}</span>
                     <div className="habit-week-progress" role="progressbar" aria-label={`${habit.name}: ${t('haftalik progress')}`} aria-valuenow={habitWeekProgress} aria-valuemin="0" aria-valuemax="100"><span style={{ width: `${habitWeekProgress}%` }} /></div>
@@ -299,18 +297,22 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
                       })}
                     </div>
                   </div>
-                  <div className="habit-reports">
-                    <p className="habit-report-summary">{t('Bu hafta')} <strong>{habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)} ({habitWeekProgress}%)</strong>; {t('bu oy')} <strong>{monthDone}/{monthDays.length} {dayLabel(monthDays.length)} ({monthProgress}%)</strong> {t('bajardingiz.')}</p>
-                    <div className="habit-month-chart" role="img" aria-label={`${habit.name}: ${t('oylik hisobot')}, ${monthDone} ${t('kun')} ${monthDays.length} ${t('rejalashtirilgan kundan')}`}>
-                      {monthWeeks.map((week) => (
-                        <div className="habit-month-chart-column" key={week.label} title={`${week.label} ${t('kunlar:')} ${week.done}/${week.total} (${week.progress}%)`}>
-                          <span className="habit-month-chart-track"><span style={{ height: `${week.progress}%` }} /></span>
-                          <small>{week.label}</small>
-                        </div>
-                      ))}
+                  <div className="habit-expanded-details" aria-hidden={!expanded}>
+                    {streak >= 21 && <span className="habit-formed-badge"><i className="ph ph-seal-check" /> {t('Odat shakllandi')}</span>}
+                    {habit.goal && <p><i className="ph ph-target" /> {habit.goal}</p>}
+                    <div className="habit-reports">
+                      <p className="habit-report-summary">{t('Bu hafta')} <strong>{habitWeekDone}/{activeWeekDays.length} {dayLabel(activeWeekDays.length)} ({habitWeekProgress}%)</strong>; {t('bu oy')} <strong>{monthDone}/{monthDays.length} {dayLabel(monthDays.length)} ({monthProgress}%)</strong> {t('bajardingiz.')}</p>
+                      <div className="habit-month-chart" role="img" aria-label={`${habit.name}: ${t('oylik hisobot')}, ${monthDone} ${t('kun')} ${monthDays.length} ${t('rejalashtirilgan kundan')}`}>
+                        {monthWeeks.map((week) => (
+                          <div className="habit-month-chart-column" key={week.label} title={`${week.label} ${t('kunlar:')} ${week.done}/${week.total} (${week.progress}%)`}>
+                            <span className="habit-month-chart-track"><span style={{ height: `${week.progress}%` }} /></span>
+                            <small>{week.label}</small>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                    {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>{t('Nega boshlagandim?')}</strong> {habit.reason}</span></p>}
                   </div>
-                  {habit.reason && <p className="habit-reason"><i className="ph ph-heart" /> <span><strong>{t('Nega boshlagandim?')}</strong> {habit.reason}</span></p>}
                 </div>
               </div>
               <div className="habit-actions">
@@ -332,12 +334,11 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
               <path d="m60 113 4 7 8 1-6 5 1 8-7-4-7 4 2-8-6-5 8-1z" fill="#e9a23b" />
               <path d="m184 60 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#7157e8" />
             </svg>
-            <h4>{t('Hali odatlaringiz yo‘q. Eng kichik qadamdan boshlang!')}</h4>
-            <p>{t('Bugun boshlagan kichik odatingiz ertangi katta o‘zgarishlarga yo‘l ochadi.')}</p>
+            <h4>{t('Hali odatlaringiz yo‘q.')}</h4>
             <button type="button" className="button button-primary" onClick={() => nameInputRef.current?.focus()}><i className="ph ph-plus" /> {t('Birinchi odatni qo‘shish')}</button>
           </div>}
         </section>
-        <aside className="surface-card add-task-card"><span className="eyebrow">{t(editingId ? 'ODATNI TAHRIRLASH' : 'YANGI ODAT')}</span><h3>{t(editingId ? 'Odatni yangilang' : 'Yaxshi odat yarating')}</h3><p>{t('Maqsad sari muntazam kichik qadam qo‘ying.')}</p>
+        <aside className="surface-card add-task-card"><h3>{t(editingId ? 'Odatni yangilang' : 'Yangi odat')}</h3>
           <form className="form-stack" onSubmit={editingId ? saveEdit : addHabit}>
             <label>{t('Odat nomi')}<input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder={t('Masalan, ertalab sayr')} maxLength="100" required disabled={saving} /></label>
             <label>{t('Maqsad')} <span className="optional">{t('(ixtiyoriy)')}</span><input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder={t('Masalan, 20 daqiqa')} maxLength="100" disabled={saving} /></label>

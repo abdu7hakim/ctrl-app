@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
   createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
   signInWithEmailAndPassword, 
   updateProfile 
 } from 'firebase/auth';
@@ -15,8 +16,47 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
   const [mode, setMode] = useState('signup');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState('');
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetNotice, setResetNotice] = useState('');
   const isSignup = mode === 'signup';
   const panelTransition = { duration: 0.4, ease: 'easeInOut' };
+
+  const openResetModal = () => {
+    setResetEmail(email);
+    setResetError('');
+    setResetNotice('');
+    setResetOpen(true);
+  };
+
+  const sendResetLink = async (event) => {
+    event.preventDefault();
+    setResetError('');
+    setResetBusy(true);
+
+    try {
+      await sendPasswordResetEmail(auth, resetEmail.trim());
+      setResetOpen(false);
+      setResetNotice('Parolni tiklash havolasi emailingizga yuborildi. Iltimos, pochtangizni tekshiring.');
+    } catch (resetSendError) {
+      let errorMessage = 'Parolni tiklash havolasini yuborib bo‘lmadi. Qayta urinib ko‘ring.';
+      if (resetSendError.code === 'auth/user-not-found') {
+        errorMessage = 'Bunday email topilmadi.';
+      } else if (resetSendError.code === 'auth/invalid-email') {
+        errorMessage = 'Email manzili noto‘g‘ri.';
+      } else if (resetSendError.code === 'auth/too-many-requests') {
+        errorMessage = 'Juda ko‘p urinish bo‘ldi. Birozdan so‘ng qayta urinib ko‘ring.';
+      } else if (resetSendError.code === 'auth/network-request-failed') {
+        errorMessage = 'Internet aloqasi yo‘q. Qayta urinib ko‘ring.';
+      }
+      setResetError(errorMessage);
+    } finally {
+      setResetBusy(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -100,11 +140,8 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
       <motion.section layout transition={panelTransition} className="auth-art">
         <div className="brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
         <div className="auth-hero">
-          <span className="eyebrow">{t('SHAXSIY MAKONINGIZ')}</span>
           <h1>{t('Hayotingizni')}<br />{t('boshqarishni')}<br /><span>{t('bugun boshlang.')}</span></h1>
-          <p>{t('Vazifalar, odatlar va diqqat — barchasi bir joyda.')}</p>
         </div>
-        <div className="auth-art-footer">{t('Fikringizni jamlang. Maqsad sari yuring.')}</div>
       </motion.section>
       <motion.section layout transition={panelTransition} className="auth-panel">
         <AnimatePresence mode="wait" initial={false}>
@@ -121,9 +158,8 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
           </button>
           <div className="auth-mobile-brand"><img className="brand-mark" src={`${process.env.PUBLIC_URL}/assets/ctrl-app-logo.png`} alt="" /> CTRL App</div>
           <div className="auth-heading">
-            <span className="eyebrow">{t(mode === 'signup' ? 'BOSHLASH' : 'QAYTGANINGIZDAN XURSANDMIZ')}</span>
             <h2>{t(mode === 'signup' ? 'Hisob yarating' : 'Hisobingizga kiring')}</h2>
-            <p>{t(mode === 'signup' ? 'Bugundan unumli kunlar sari.' : 'Davom etish uchun ma’lumotlaringizni kiriting.')}</p>
+            <p>{t('Davom etish uchun ma’lumotlaringizni kiriting.')}</p>
           </div>
           <form className="form-stack" onSubmit={submit}>
             {mode === 'signup' && (
@@ -132,10 +168,11 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
                 <label>{t('Familiya')}<input name="lastName" autoComplete="family-name" placeholder={t('Familiyangiz')} required /></label>
               </div>
             )}
-            <label>{t('E-mail manzil')}            <input name="email" type="email" autoComplete="email" placeholder={language === 'en' ? 'you@example.com' : 'siz@example.com'} required /></label>
-            <label>{t('Parol')}<input name="password" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} minLength="6" placeholder={t('Kamida 6 ta belgi')} required /></label>
+            <label>{t('E-mail manzil')}<input name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={language === 'en' ? 'you@example.com' : 'siz@example.com'} required /></label>
+            <label className="auth-password-label">{t('Parol')}<input name="password" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} minLength="6" placeholder={t('Kamida 6 ta belgi')} required />{mode === 'login' && <button className="auth-forgot-link" type="button" onClick={openResetModal}>{t('Parolni unutdingizmi?')}</button>}</label>
             {mode === 'signup' && <label className="check-label"><input type="checkbox" required /> {t('Foydalanish shartlariga roziman')}</label>}
             {error && <p className="form-error" role="alert">{t(error)}</p>}
+            {resetNotice && <p className="auth-reset-notice" role="status">{t(resetNotice)}</p>}
             <button className="button button-primary button-wide" disabled={busy}>
               {t(busy ? 'Kuting...' : mode === 'signup' ? 'Hisob yaratish' : 'Kirish')}
               <i className="ph ph-arrow-right" aria-hidden="true" />
@@ -150,6 +187,48 @@ function AuthScreen({ onAuthenticated, language = 'uz', onChangeLanguage }) {
         </motion.div>
         </AnimatePresence>
       </motion.section>
+      <AnimatePresence>
+        {resetOpen && (
+          <motion.div
+            className="auth-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !resetBusy) setResetOpen(false);
+            }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !resetBusy) setResetOpen(false);
+            }}
+          >
+            <motion.section
+              className="auth-reset-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-reset-title"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <button className="auth-reset-close" type="button" aria-label={t('Yopish')} onClick={() => setResetOpen(false)} disabled={resetBusy}>
+                <i className="ph ph-x" aria-hidden="true" />
+              </button>
+              <span className="auth-reset-icon"><i className="ph ph-lock-key-open" aria-hidden="true" /></span>
+              <h2 id="auth-reset-title">{t('Parolni tiklash')}</h2>
+              <p>{t('Hisobingizga bog‘langan email manzilini kiriting. Tiklash havolasini yuboramiz.')}</p>
+              <form className="form-stack" onSubmit={sendResetLink}>
+                <label>{t('E-mail manzil')}<input type="email" autoComplete="email" autoFocus value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder={language === 'en' ? 'you@example.com' : 'siz@example.com'} required disabled={resetBusy} /></label>
+                {resetError && <p className="form-error" role="alert">{t(resetError)}</p>}
+                <button className="button button-primary button-wide" type="submit" disabled={resetBusy}>
+                  <i className="ph ph-paper-plane-tilt" aria-hidden="true" /> {t(resetBusy ? 'Yuborilmoqda...' : 'Tiklash havolasini yuborish')}
+                </button>
+              </form>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

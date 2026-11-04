@@ -182,7 +182,6 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
             >
               <div className="avatar-picker-heading">
                 <div>
-                  <span className="eyebrow">{t('SHAXSIYLASHTIRISH')}</span>
                   <h2 id="avatar-picker-title">{t('Avatarni tanlang')}</h2>
                 </div>
                 <button type="button" className="icon-button" aria-label={t('Yopish')} onClick={() => setAvatarPickerOpen(false)}>
@@ -213,7 +212,7 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
       </AnimatePresence>
       <section className="profile-security">
         <section className="surface-card profile-security-card">
-          <div className="section-heading"><div><span className="eyebrow">{t('HISOB XAVFSIZLIGI')}</span><h3>{t('Parolni o‘zgartirish')}</h3></div></div>
+          <div className="section-heading"><div><h3>{t('Parolni o‘zgartirish')}</h3></div></div>
           <p className="security-description">{t('Hisobingizni himoya qilish uchun joriy parolingizni tasdiqlang.')}</p>
           <form className="profile-security-form" onSubmit={changePassword}>
             <label>{t('Joriy parol')}<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => { setCurrentPassword(event.target.value); setPasswordError(''); }} required disabled={passwordSaving} /></label>

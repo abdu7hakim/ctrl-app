@@ -215,7 +215,7 @@ function TodoPage({ todos, onChange, onStartFocus, isLoading = false, language =
             {!visibleTodos.length && <div className="empty-state"><i className="ph ph-notepad" /><p>{t(query ? 'Qidiruv bo‘yicha vazifa topilmadi.' : 'Bu ro‘yxatda hali vazifa yo‘q.')}</p></div>}
           </div>
         </section>
-        <aside className="surface-card add-task-card"><span className="eyebrow">{t('YANGI REJA')}</span><h3>{t('Vazifa qo‘shish')}</h3><p>{t('Keyingi muhim qadamingiz nima?')}</p>
+        <aside className="surface-card add-task-card"><h3>{t('Vazifa qo‘shish')}</h3>
           <form className="form-stack" onSubmit={addTodo}>
             <label>{t('Vazifa nomi')}<input autoFocus name="title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={t('Masalan, kitob o‘qish')} maxLength="120" required disabled={saving} /></label>
             <label>{t('Izoh')} <span className="optional">{t('(ixtiyoriy)')}</span><textarea rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder={t('Qo‘shimcha ma’lumot...')} maxLength="500" disabled={saving} /></label>

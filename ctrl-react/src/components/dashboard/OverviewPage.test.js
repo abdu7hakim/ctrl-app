@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import OverviewPage from './OverviewPage';
+import { getDailyMotivation } from '../../utils/motivation';
 
 const data = { todos: [], habits: [], routine: {} };
 const stats = { done: 0, pending: 0, completedHabits: 0, focusMinutes: 0 };
@@ -44,4 +45,10 @@ test('shows a themed activity heatmap with accessible daily totals', () => {
   expect(screen.getByRole('group', { name: 'Oxirgi olti oydagi kundalik faollik xaritasi' })).toBeInTheDocument();
   expect(screen.getByLabelText('2 ta bajarilgan ish · ' + new Intl.DateTimeFormat('uz-UZ', { dateStyle: 'long' }).format(today))).toHaveClass('activity-level-2');
   expect(document.querySelectorAll('.activity-cell')).toHaveLength(26 * 7 + 4);
+});
+
+test('shows the daily motivation below dashboard activity', () => {
+  render(<OverviewPage user={{ firstName: 'Aziza' }} data={data} stats={stats} onNavigate={jest.fn()} />);
+
+  expect(screen.getByRole('complementary', { name: 'BUGUNGI ILHOM' })).toHaveTextContent(getDailyMotivation());
 });

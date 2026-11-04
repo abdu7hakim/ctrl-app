@@ -7,7 +7,7 @@ test('shows the coming soon message and a QR code for the referral link', () => 
   expect(screen.getByRole('heading', { name: 'Leaderboard is Coming Soon' })).toBeInTheDocument();
   expect(screen.getByText('We are working hard to bring you a competitive ranking system. Soon you will be able to compete with friends, earn XP, and climb the ranks!')).toBeInTheDocument();
   expect(screen.getByTitle('Scan to open CTRL App')).toBeInTheDocument();
-  expect(screen.getByText("We will notify you when it's ready.")).toBeInTheDocument();
+  expect(screen.queryByText("We will notify you when it's ready.")).not.toBeInTheDocument();
 });
 
 test('copies the referral link and confirms it to the user', async () => {

@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { colorThemes } from '../../utils/themes';
 import { translate } from '../../utils/language';
+import { useNotifications } from '../../hooks/useNotifications';
 
-function SettingsPage({ darkMode, themeSaving, colorTheme, language = 'uz', onChangeLanguage, onToggleTheme, onSelectColorTheme, onResetData }) {
+function SettingsPage({ userId, darkMode, themeSaving, colorTheme, language = 'uz', onChangeLanguage, onToggleTheme, onSelectColorTheme, onResetData }) {
   const t = (text) => translate(text, language);
+  const { requestNotifications, isRequesting, error: notificationError, success: notificationSuccess, permission } = useNotifications(userId);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
   const [resetError, setResetError] = useState('');
@@ -56,9 +59,35 @@ function SettingsPage({ darkMode, themeSaving, colorTheme, language = 'uz', onCh
           <span />
         </button>
       </section>
+      <motion.section
+        className="surface-card settings-card settings-notifications-card"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+      >
+        <div className="settings-copy">
+          <span className="stat-icon green"><i className="ph ph-bell" aria-hidden="true" /></span>
+          <div><h2>{t('Brauzer bildirishnomalari')}</h2><p>{t('Vazifalaringiz va Pomodoro sessiyalaringiz uchun eslatmalar oling.')}</p></div>
+        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          {permission === 'granted'
+            ? <motion.div key="enabled" className="settings-notification-state settings-notification-state-enabled" role="status" initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .96 }} transition={{ duration: .16 }}>
+              <i className="ph ph-check-circle" aria-hidden="true" /> {t('Yoqilgan')}
+            </motion.div>
+            : permission === 'denied'
+              ? <motion.div key="blocked" className="settings-notification-state settings-notification-state-blocked" role="status" initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .96 }} transition={{ duration: .16 }}>
+                <i className="ph ph-prohibit" aria-hidden="true" /> {t('Bloklangan')}
+              </motion.div>
+              : <motion.button key="enable" className="button button-primary" type="button" onClick={requestNotifications} disabled={isRequesting || themeSaving} initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .96 }} transition={{ duration: .16 }}>
+                <i className="ph ph-bell-ringing" aria-hidden="true" /> {t(isRequesting ? 'Yuborilmoqda...' : 'Yoqish')}
+              </motion.button>}
+        </AnimatePresence>
+        {notificationError && <p className="settings-notification-message settings-notification-error" role="alert">{t(notificationError)}</p>}
+        {notificationSuccess && <p className="settings-notification-message settings-notification-success" role="status">{t(notificationSuccess)}</p>}
+      </motion.section>
       <section className="surface-card theme-picker-card" aria-labelledby="color-theme-heading">
         <div className="section-heading">
-          <div><span className="eyebrow">{t('RANGLAR')}</span><h3 id="color-theme-heading">{t('Rang mavzusi')}</h3></div>
+          <div><h3 id="color-theme-heading">{t('Rang mavzusi')}</h3></div>
           <span className="theme-selected-name">{t(colorThemes.find((theme) => theme.id === colorTheme)?.name)}</span>
         </div>
         <p className="theme-picker-description">{t('Sayt ranglarini o‘zingizga moslang. Tanlovingiz hisobingizda saqlanadi.')}</p>

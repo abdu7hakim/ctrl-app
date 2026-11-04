@@ -13,6 +13,8 @@ The app uses Firebase Authentication for sign-up/sign-in and Firestore for the s
 
 Firebase initialization is in `src/firebase.js`. Configure the Firebase web app there (or use your deployment's environment-based configuration) and enable Email/Password sign-in and Firestore in the Firebase console.
 
+To enable browser push notifications, create a Web Push certificate key pair in Firebase Console under Project settings → Cloud Messaging, then set the public key as `REACT_APP_FIREBASE_VAPID_KEY` in the environment used to build the app. Notification permission is requested from Settings, and the resulting FCM token is saved to the signed-in user's `users/{uid}` document.
+
 ## Firestore security rules
 
 The `firestore.rules` file limits user documents to their authenticated owner and permits only authenticated users to create their own contact messages. From this folder, deploy the rules with:

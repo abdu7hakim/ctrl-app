@@ -34,37 +34,9 @@ const pageTitles = {
   settings: 'Sozlamalar',
 };
 
-const pageDescriptions = {
-  todo: {
-    subtitle: 'KUNLIK REJANGIZ',
-    description: 'Rejalaringizni yozib boring va har bir qadamni belgilang.',
-  },
-  habits: {
-    subtitle: 'IZCHILLIK — KALIT',
-    description: 'Har kuni takrorlang. Kichik odatlar katta o‘zgarishlar yaratadi.',
-  },
-  focus: {
-    subtitle: 'CHALG‘ITUVCHILARSIZ VAQT',
-    description: 'Fokus va tanaffus davomiyligini o‘zingiz belgilang.',
-  },
-  profile: {
-    subtitle: 'SHAXSIY MA’LUMOTLAR',
-    description: 'Hisobingizdagi ism va ma’lumotlarni yangilang.',
-  },
-  contact: {
-    subtitle: 'BIZ BILAN BOG‘LANING',
-    description: 'Savol yoki takliflaringiz bormi? Bizga yozing.',
-  },
-  settings: {
-    subtitle: 'ILOVA SOZLAMALARI',
-    description: 'CTRL App ilovasining ko‘rinishini o‘zingizga moslang.',
-  },
-};
-
 function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onToggleTheme, onLogout, language = 'uz', onChangeLanguage, children }) {
   const t = (text) => translate(text, language);
   const [menuOpen, setMenuOpen] = useState(false);
-  const pageDescription = pageDescriptions[page];
 
   const navigate = (id) => {
     onNavigate(id);
@@ -102,7 +74,6 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
           <div className="topbar-title">
             <div className="topbar-heading-row">
               <h1>{t(pageTitles[page] || pageTitles.dashboard)}</h1>
-                  {pageDescription && <div className="topbar-page-meta"><span className="eyebrow">{t(pageDescription.subtitle)}</span><p>{t(pageDescription.description)}</p></div>}
             </div>
           </div>
           <div className="topbar-actions">

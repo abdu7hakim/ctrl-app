@@ -415,7 +415,6 @@ function RoutinePage({ routines, routineBadges: savedBadges, onSave, language = 
             <section className="routine-card routine-calendar-card" aria-label={t('Calendar')}>
               <div className="routine-card-heading">
                 <div>
-                  <span className="routine-eyebrow">{t('YOUR SCHEDULE')}</span>
                   <h2>{t('Calendar')}</h2>
                 </div>
                 <div className="routine-month-controls">
@@ -459,7 +458,6 @@ function RoutinePage({ routines, routineBadges: savedBadges, onSave, language = 
             <section className="routine-card routine-weekdays-card" aria-labelledby="routine-weekdays-title">
               <div className="routine-card-heading">
                 <div>
-                  <span className="routine-eyebrow">{t('REPEAT YOUR ROUTINE')}</span>
                   <h2 id="routine-weekdays-title">{t('Select Weekdays')}</h2>
                 </div>
               </div>
@@ -485,7 +483,6 @@ function RoutinePage({ routines, routineBadges: savedBadges, onSave, language = 
             <section className="routine-card routine-range-card">
               <div className="routine-card-heading">
                 <div>
-                  <span className="routine-eyebrow">{t('PLAN AHEAD')}</span>
                   <h2>{t('Date range')}</h2>
                 </div>
                 <span className="routine-range-icon" aria-hidden="true">↗</span>
@@ -527,7 +524,6 @@ function RoutinePage({ routines, routineBadges: savedBadges, onSave, language = 
           {showRoutineTable && <section className="routine-card routine-table-card">
             <div className="routine-table-heading">
               <div>
-                <span className="routine-eyebrow">{t('A LITTLE PROGRESS, EVERY DAY')}</span>
                 <h2>{t('Daily Routine')}</h2>
                 <p>{selectedLabel}</p>
               </div>

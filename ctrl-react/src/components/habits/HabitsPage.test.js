@@ -58,12 +58,12 @@ test('shows separate weekly progress and excludes days before a habit was create
 test('shows an illustrated prompt when there are no habits', () => {
   render(<HabitsPage habits={[]} onChange={jest.fn()} />);
 
-  expect(screen.getByText('Hali odatlaringiz yo‘q. Eng kichik qadamdan boshlang!')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Hali odatlaringiz yo‘q.' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Birinchi odatni qo‘shish' }));
   expect(screen.getByLabelText('Odat nomi')).toHaveFocus();
 });
 
-test('toggles habit details from the card while keeping checkbox actions separate', async () => {
+test('keeps weekly values visible and toggles detailed habit information separately from checkbox actions', async () => {
   const onChange = jest.fn().mockResolvedValue();
   const habit = {
     id: 'mobile-habit',
@@ -77,6 +77,11 @@ test('toggles habit details from the card while keeping checkbox actions separat
   const summary = card.querySelector('.habit-summary');
 
   expect(summary).toHaveAttribute('aria-expanded', 'false');
+  expect(card.querySelector('.habit-week')).toBeInTheDocument();
+  expect(card.querySelector('.habit-week').closest('.habit-expanded-details')).toBeNull();
+  const details = card.querySelector('.habit-reports').closest('.habit-expanded-details');
+  expect(details).toBeInTheDocument();
+  expect(details).toHaveAttribute('aria-hidden', 'true');
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
     await Promise.resolve();
@@ -88,6 +93,7 @@ test('toggles habit details from the card while keeping checkbox actions separat
 
   fireEvent.click(summary);
   expect(summary).toHaveAttribute('aria-expanded', 'true');
+  expect(details).toHaveAttribute('aria-hidden', 'false');
   expect(card).toHaveClass('habit-item-expanded');
   fireEvent.click(summary);
   expect(summary).toHaveAttribute('aria-expanded', 'false');
@@ -205,6 +211,7 @@ test('highlights a seven-day streak, awards the formed-habit badge, and shows th
   ];
 
   render(<HabitsPage habits={habits} onChange={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: /Yigirma bir kunlik odat 21 kun davomiylik/ }));
 
   expect(screen.getByLabelText('7 kun davomiylik')).toHaveClass('habit-streak-week');
   expect(screen.getByLabelText('21 kun davomiylik')).toHaveClass('habit-streak-week');

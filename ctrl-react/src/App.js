@@ -507,6 +507,7 @@ function App() {
     }} language={language} />,
     contact: <ContactPage user={user} onSend={() => setNotice('Xabaringiz qabul qilindi. Rahmat!')} language={language} />,
     settings: <SettingsPage
+      userId={user.uid}
       darkMode={darkMode}
       themeSaving={themeSaving}
       colorTheme={colorTheme}

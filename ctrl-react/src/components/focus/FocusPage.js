@@ -301,11 +301,10 @@ function FocusPage({
           </div>
           {error && <p className="form-error" role="alert">{t(error)}</p>}
           {audioError && <p className="form-error" role="status">{t(audioError)}</p>}
-          <p className="timer-hint"><i className="ph ph-lightbulb" /> {t('Kichik maslahat: boshlashdan oldin telefoningizni chetga qo‘ying.')}</p>
         </section>
         <aside className="focus-aside">
           <section className="surface-card focus-settings">
-            <div className="section-heading"><div><span className="eyebrow">{t('O‘ZINGIZGA MOSLANG')}</span><h3>{t('Pomodoro sozlamalari')}</h3></div></div>
+            <div className="section-heading"><div><h3>{t('Pomodoro sozlamalari')}</h3></div></div>
             <form className="focus-settings-form" onSubmit={savePreferences}>
               <label>{t('Fokus')} ({t('daqiqa')})<input aria-label={t('Fokus davomiyligi')} type="number" min="1" step="1" inputMode="numeric" value={focusDraft} onChange={(event) => setFocusDraft(event.target.value)} disabled={running || saving || preferencesSaving || completedPending} /></label>
               <label>{t('Tanaffus')} ({t('daqiqa')})<input aria-label={t('Tanaffus davomiyligi')} type="number" min="1" step="1" inputMode="numeric" value={breakDraft} onChange={(event) => setBreakDraft(event.target.value)} disabled={running || saving || preferencesSaving || completedPending} /></label>
@@ -338,8 +337,6 @@ function FocusPage({
               </div>
             </form>
           </section>
-          <section className="surface-card focus-guide"><span className="promo-icon"><i className="ph ph-brain" /></span><span className="eyebrow">{t('POMODORO USULI')}</span><h3>{t('Chuqur ish uchun vaqt ajrating')}</h3><p>{t('Fokus va tanaffus vaqtini o‘zingizga mos belgilang. Navbatma-navbat ishlang va dam oling.')}</p></section>
-          <section className="surface-card focus-rule"><i className="ph ph-quotes" /><blockquote>{t('“Yaxshi boshlangan ish — yarim bitgan ish.”')}</blockquote><span>{t('Bugungi eslatma')}</span></section>
         </aside>
       </div>
     </div>

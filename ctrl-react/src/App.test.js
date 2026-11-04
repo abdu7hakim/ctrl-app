@@ -12,10 +12,10 @@ import AuthScreen from './components/auth/AuthScreen';
 import App from './App';
 import TodoPage from './components/todo/TodoPage';
 import { avatarOptions } from './utils/avatars';
-import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
 import { colorThemes } from './utils/themes';
 import { getTodoDeadline, isTodoOverdue, isTodoUrgent } from './utils/todoDeadlines';
 import { createFocusMusic, focusMusicOptions } from './utils/focusMusic';
+import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
 
 const originalAudioContext = window.AudioContext;
 
@@ -291,7 +291,7 @@ test('loads saved routine tasks and custom badges from the user document', async
 test('todo creation, completion, and deletion are persisted to the signed-in user document', async () => {
   await openPage('Vazifalar');
   expect(screen.getAllByRole('heading', { name: 'Vazifalar' })).toHaveLength(1);
-  expect(screen.getByText('Rejalaringizni yozib boring va har bir qadamni belgilang.')).toBeInTheDocument();
+  expect(screen.queryByText('Rejalaringizni yozib boring va har bir qadamni belgilang.')).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Vazifa nomi'), { target: { value: 'React o‘rganish' } });
   fireEvent.click(screen.getByRole('button', { name: /vazifa yaratish/i }));
 
@@ -625,7 +625,7 @@ test('settings reset displays save errors and keeps the confirmation open', asyn
   expect(updatePassword).not.toHaveBeenCalled();
 });
 
-test('daily motivation selects a stable quote from the 25-message collection', () => {
+test('daily motivation selects a stable quote from its collection', () => {
   const date = new Date(2026, 9, 27);
   expect(motivationalQuotes).toHaveLength(25);
   expect(getDailyMotivation(date)).toBe(getDailyMotivation(date));
