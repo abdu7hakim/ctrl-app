@@ -34,7 +34,36 @@ service cloud.firestore {
         && request.resource.data.userId == resource.data.userId;
     }
 
+    match /task_completion_archive/{archiveId} {
+      allow create, update: if isOwner(request.resource.data.userId)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'taskId',
+          'completedAt',
+          'priority'
+        ])
+        && request.resource.data.taskId is string
+        && request.resource.data.completedAt is string
+        && request.resource.data.priority is string;
+      allow read, delete: if ownsDocument();
+    }
+
     match /habits/{habitId} {
+      allow create: if createsOwnedDocument();
+      allow read, delete: if ownsDocument();
+      allow update: if ownsDocument()
+        && request.resource.data.userId == resource.data.userId;
+    }
+
+    match /pomodoro_sessions/{sessionId} {
+      allow create: if createsOwnedDocument()
+        && request.resource.data.durationMinutes is number
+        && request.resource.data.durationMinutes > 0;
+      allow read, delete: if ownsDocument();
+      allow update: if false;
+    }
+
+    match /habit_logs/{habitLogId} {
       allow create: if createsOwnedDocument();
       allow read, delete: if ownsDocument();
       allow update: if ownsDocument()

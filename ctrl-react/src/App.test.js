@@ -1,6 +1,19 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { addDoc, collection, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
   EmailAuthProvider,
@@ -22,6 +35,8 @@ const originalAudioContext = window.AudioContext;
 jest.mock('./firebase', () => ({
   auth: { currentUser: { uid: 'user-1', email: 'aziza@example.com' } },
   db: {},
+  googleProvider: {},
+  signInWithPopup: jest.fn(),
 }));
 
 jest.mock('firebase/auth', () => ({
@@ -40,10 +55,19 @@ jest.mock('firebase/firestore', () => ({
   collection: jest.fn((_db, name) => ({ name })),
   doc: jest.fn((_db, name, id) => ({ name, id })),
   getDoc: jest.fn(),
+  getDocs: jest.fn().mockResolvedValue({ docs: [] }),
   increment: jest.fn((amount) => ({ increment: amount })),
+  query: jest.fn((collectionRef, ...constraints) => ({ collectionRef, constraints })),
   serverTimestamp: jest.fn(() => 'server-timestamp'),
   setDoc: jest.fn().mockResolvedValue(),
   updateDoc: jest.fn().mockResolvedValue(),
+  where: jest.fn((field, operator, value) => ({ field, operator, value })),
+  writeBatch: jest.fn(() => ({
+    update: jest.fn(),
+    set: jest.fn(),
+    delete: jest.fn(),
+    commit: jest.fn().mockResolvedValue(),
+  })),
 }));
 
 import { onAuthStateChanged } from 'firebase/auth';
@@ -69,8 +93,17 @@ beforeEach(() => {
   doc.mockImplementation((_db, name, id) => ({ name, id }));
   collection.mockImplementation((_db, name) => ({ name }));
   increment.mockImplementation((amount) => ({ increment: amount }));
+  query.mockImplementation((collectionRef, ...constraints) => ({ collectionRef, constraints }));
   serverTimestamp.mockReturnValue('server-timestamp');
   updateDoc.mockResolvedValue();
+  getDocs.mockResolvedValue({ docs: [] });
+  where.mockImplementation((field, operator, value) => ({ field, operator, value }));
+  writeBatch.mockImplementation(() => ({
+    update: jest.fn(),
+    set: jest.fn(),
+    delete: jest.fn(),
+    commit: jest.fn().mockResolvedValue(),
+  }));
   reauthenticateWithCredential.mockResolvedValue();
   updatePassword.mockResolvedValue();
   setDoc.mockResolvedValue();
@@ -155,6 +188,21 @@ test('sign-up writes the profile and default app data to the new user document',
   });
 });
 
+test('creates a profile with the Firebase Auth name and email for a first-time user', async () => {
+  getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
+  render(<App />);
+
+  await waitFor(() => expect(setDoc).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    expect.objectContaining({
+      firstName: 'Aziza',
+      lastName: 'Aliyeva',
+      email: 'aziza@example.com',
+    }),
+    { merge: true },
+  ));
+});
+
 test('auth mode switch swaps the panels without submitting or reloading', async () => {
   render(<AuthScreen />);
 
@@ -195,6 +243,33 @@ test('mobile bottom navigation links the five main pages and marks the active pa
   await waitFor(() => {
     expect(within(mobileNavigation).getByRole('button', { name: 'Odatlar' })).toHaveAttribute('aria-current', 'page');
   });
+});
+
+test('analytics page is reachable from the sidebar and shows all three charts', async () => {
+  render(<App />);
+  const navigation = await screen.findByRole('navigation', { name: 'Asosiy menyu' });
+
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Statistika' }));
+
+  const analyticsPage = await screen.findByRole('region', { name: 'Haftalik grafiklar' });
+  expect(analyticsPage).toBeInTheDocument();
+  expect(within(analyticsPage).getByRole('heading', { name: 'Haftalik fokus vaqti' })).toBeInTheDocument();
+  expect(within(analyticsPage).getByRole('heading', { name: 'Haftalik bajarilgan odatlar' })).toBeInTheDocument();
+  expect(within(analyticsPage).getByRole('heading', { name: 'Vazifalar ustuvorligi' })).toBeInTheDocument();
+  expect(await screen.findAllByText('Bu hafta uchun ma’lumot yo‘q')).toHaveLength(2);
+  expect(getDocs).toHaveBeenCalledTimes(4);
+  expect(query).toHaveBeenCalledWith(
+    { name: 'pomodoro_sessions' },
+    { field: 'userId', operator: '==', value: 'user-1' },
+  );
+  expect(query).toHaveBeenCalledWith(
+    { name: 'habit_logs' },
+    { field: 'userId', operator: '==', value: 'user-1' },
+  );
+  expect(query).toHaveBeenCalledWith(
+    { name: 'tasks' },
+    { field: 'userId', operator: '==', value: 'user-1' },
+  );
 });
 
 test('shows loading skeletons on dashboard, todo, and habits until Firebase data arrives', async () => {
@@ -296,7 +371,8 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
   fireEvent.click(screen.getByRole('button', { name: /vazifa yaratish/i }));
 
   expect(await screen.findByRole('heading', { name: 'React o‘rganish' })).toBeInTheDocument();
-  expect(updateDoc).toHaveBeenLastCalledWith(
+  let taskBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(taskBatch.update).toHaveBeenCalledWith(
     doc(expect.anything(), 'users', 'user-1'),
     expect.objectContaining({ todos: expect.arrayContaining([expect.objectContaining({ title: 'React o‘rganish', status: 'open' })]) }),
   );
@@ -308,15 +384,16 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
 
   fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
   expect(await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' })).toBeInTheDocument();
-  expect(updateDoc).toHaveBeenLastCalledWith(
-    expect.anything(),
-    expect.objectContaining({ todos: expect.arrayContaining([expect.objectContaining({
-      status: 'done',
-      completedAt: (() => {
-        const today = new Date();
-        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      })(),
-    })]) }),
+  taskBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  const completedTask = taskBatch.update.mock.calls[0][1].todos[0];
+  const todayKey = (() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  })();
+  expect(completedTask).toEqual(expect.objectContaining({ status: 'done', completedAt: todayKey }));
+  expect(taskBatch.set).toHaveBeenCalledWith(
+    { name: 'task_completion_archive', id: `user-1_${completedTask.id}_${todayKey}` },
+    { userId: 'user-1', taskId: completedTask.id, completedAt: todayKey, priority: 'medium' },
   );
   fireEvent.click(screen.getByRole('button', { name: 'React ilovasini o‘rganish vazifasini o‘chirish' }));
   expect(await screen.findByText('Bu ro‘yxatda hali vazifa yo‘q.')).toBeInTheDocument();
@@ -351,6 +428,55 @@ test('todo completion activity date is cleared when a task is reopened', async (
   const reopenedTodo = onChange.mock.calls[1][0][0];
   expect(reopenedTodo.status).toBe('open');
   expect(reopenedTodo).not.toHaveProperty('completedAt');
+});
+
+test('purges completed tasks older than thirty days after archiving XP history', async () => {
+  jest.useFakeTimers().setSystemTime(new Date(2026, 10, 5, 12));
+  const oldCompletion = '2026-10-04';
+  const expiredTask = {
+    id: 'old-user-task',
+    title: 'Completed last month',
+    status: 'done',
+    completedAt: oldCompletion,
+    priority: 'high',
+  };
+  const taskDocument = {
+    id: 'old-collection-task',
+    ref: { collection: 'tasks', id: 'old-collection-task' },
+    data: () => ({ taskId: 'old-collection-task', status: 'done', completedAt: oldCompletion, priority: 'low' }),
+  };
+  const oldOpenTaskDocument = {
+    id: 'old-open-task',
+    ref: { collection: 'tasks', id: 'old-open-task' },
+    data: () => ({ taskId: 'old-open-task', status: 'open', completedAt: oldCompletion, priority: 'low' }),
+  };
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ ...storedData, todos: [expiredTask] }),
+  });
+  getDocs.mockImplementation(({ collectionRef }) => Promise.resolve({
+    docs: collectionRef.name === 'tasks' ? [taskDocument, oldOpenTaskDocument] : [],
+  }));
+  render(<App />);
+
+  await waitFor(() => expect(writeBatch.mock.results.length).toBeGreaterThan(0));
+  const purgeBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  await waitFor(() => expect(purgeBatch.commit).toHaveBeenCalled());
+  expect(purgeBatch.update).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    { todos: [] },
+  );
+  expect(purgeBatch.set).toHaveBeenCalledWith(
+    { name: 'task_completion_archive', id: `user-1_old-user-task_${oldCompletion}` },
+    { userId: 'user-1', taskId: 'old-user-task', completedAt: oldCompletion, priority: 'high' },
+  );
+  expect(purgeBatch.set).toHaveBeenCalledWith(
+    { name: 'task_completion_archive', id: `user-1_old-collection-task_${oldCompletion}` },
+    { userId: 'user-1', taskId: 'old-collection-task', completedAt: oldCompletion, priority: 'low' },
+  );
+  expect(purgeBatch.delete).toHaveBeenCalledWith(taskDocument.ref);
+  expect(purgeBatch.delete).not.toHaveBeenCalledWith(oldOpenTaskDocument.ref);
+  jest.useRealTimers();
 });
 
 test('todo quick dates and priority are saved with the task', async () => {
@@ -454,15 +580,33 @@ test('habit creation and completion are saved with completedToday in Firestore',
   fireEvent.click(screen.getByRole('button', { name: /odat qo‘shish/i }));
 
   expect(await screen.findByText('Ertalab sayr')).toBeInTheDocument();
-  expect(updateDoc).toHaveBeenLastCalledWith(
+  let habitBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(habitBatch.update).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ habits: expect.arrayContaining([expect.objectContaining({ name: 'Ertalab sayr', completedToday: false })]) }),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
   expect(await screen.findByText('Bajarildi')).toBeInTheDocument();
-  expect(updateDoc).toHaveBeenLastCalledWith(
+  habitBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  const savedHabit = habitBatch.update.mock.calls[0][1].habits[0];
+  const today = new Date();
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  expect(habitBatch.update).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ habits: expect.arrayContaining([expect.objectContaining({ completedToday: true })]) }),
+  );
+  expect(habitBatch.set).toHaveBeenCalledWith(
+    { name: 'habit_logs', id: `user-1_${savedHabit.id}_${todayKey}` },
+    expect.objectContaining({
+      userId: 'user-1',
+      habitId: savedHabit.id,
+      date: todayKey,
+      completedAt: 'server-timestamp',
+    }),
   );
 });
 
@@ -676,9 +820,14 @@ test('a completed focus session uses Firestore atomic increments', async () => {
 
   expect(increment).toHaveBeenNthCalledWith(1, 1);
   expect(increment).toHaveBeenNthCalledWith(2, 25);
-  expect(updateDoc).toHaveBeenCalledWith(
+  const focusBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(focusBatch.update).toHaveBeenCalledWith(
     expect.anything(),
     { focusSessions: { increment: 1 }, focusMinutes: { increment: 25 } },
+  );
+  expect(focusBatch.set).toHaveBeenCalledWith(
+    expect.anything(),
+    { userId: 'user-1', durationMinutes: 25, completedAt: 'server-timestamp' },
   );
   jest.useRealTimers();
 });
@@ -716,7 +865,8 @@ test('focus task picker accumulates completed focus minutes on the selected task
   act(() => jest.advanceTimersByTime(60 * 1000));
   await act(async () => Promise.resolve());
 
-  expect(updateDoc).toHaveBeenLastCalledWith(
+  const focusBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(focusBatch.update).toHaveBeenLastCalledWith(
     { name: 'users', id: 'user-1' },
     {
       focusSessions: { increment: 1 },

@@ -11,13 +11,27 @@ import FocusPage from './components/focus/FocusPage';
 import ProfilePage from './components/profile/ProfilePage';
 import ContactPage from './components/contact/ContactPage';
 import SettingsPage from './components/settings/SettingsPage';
+import Analytics from './components/analytics/Analytics';
 import { defaultThemeId, getColorTheme } from './utils/themes';
 import { isTodoOverdue } from './utils/todoDeadlines';
+import { getTaskCompletionArchive, isCompletedTaskOlderThan } from './utils/taskRetention';
 import { clearStoredAvatar, getStoredAvatar } from './utils/avatars';
 import { getStoredLanguage, saveStoredLanguage, translate } from './utils/language';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import './App.css';
 
 const initialData = {
@@ -36,6 +50,22 @@ const initialData = {
   focusBackgroundTrack: 'ambient',
   language: 'uz',
 };
+
+function getHabitCompletionLogs(habits, userId) {
+  const logs = new Map();
+  habits.forEach((habit) => {
+    Object.entries(habit.completions || {}).forEach(([date, completed]) => {
+      if (!completed || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      const logId = `${userId}_${encodeURIComponent(habit.id)}_${date}`;
+      logs.set(logId, {
+        userId,
+        habitId: habit.id,
+        date,
+      });
+    });
+  });
+  return logs;
+}
 
 function getNameParts(displayName, email) {
   const [firstName = '', ...lastNameParts] = (displayName || '').trim().split(/\s+/);
@@ -279,6 +309,93 @@ function App() {
     };
   }, [dataLoading, user]);
 
+  useEffect(() => {
+    if (!user || dataLoading) return undefined;
+    let active = true;
+    let purgingCompletedTasks = false;
+    let lastRetentionError = '';
+
+    const purgeCompletedTasks = async () => {
+      if (purgingCompletedTasks || auth.currentUser?.uid !== user.uid) return;
+      purgingCompletedTasks = true;
+      try {
+        const [tasksSnapshot] = await Promise.all([
+          getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid))),
+        ]);
+        if (!active) return;
+
+        const expiredTodos = latestData.current.todos.filter((todo) => isCompletedTaskOlderThan(todo, 30));
+        const expiredTaskDocuments = tasksSnapshot.docs.filter((taskDocument) => (
+          isCompletedTaskOlderThan(taskDocument.data(), 30)
+        ));
+        if (!expiredTodos.length && !expiredTaskDocuments.length) {
+          lastRetentionError = '';
+          return;
+        }
+
+        const archiveRecords = new Map();
+        [...expiredTodos, ...expiredTaskDocuments.map((taskDocument) => ({
+          ...taskDocument.data(),
+          id: taskDocument.data().taskId || taskDocument.id,
+        }))].forEach((task) => {
+          const archive = getTaskCompletionArchive(user.uid, task);
+          if (archive) archiveRecords.set(archive.id, archive.data);
+        });
+
+        const expiredTodoIds = new Set(expiredTodos.map((todo) => todo.id));
+        const remainingTodos = latestData.current.todos.filter((todo) => !expiredTodoIds.has(todo.id));
+        const writes = [
+          ...Array.from(archiveRecords, ([id, record]) => ({
+            type: 'archive',
+            id,
+            record,
+          })),
+          ...expiredTaskDocuments.map((taskDocument) => ({
+            type: 'delete',
+            reference: taskDocument.ref,
+          })),
+        ];
+        if (!writes.length && !expiredTodos.length) return;
+
+        for (let index = 0; index < Math.max(writes.length, 1); index += 450) {
+          const batch = writeBatch(db);
+          if (index === 0 && expiredTodos.length) {
+            batch.update(doc(db, 'users', user.uid), { todos: remainingTodos });
+          }
+          writes.slice(index, index + 450).forEach((write) => {
+            if (write.type === 'archive') {
+              batch.set(doc(db, 'task_completion_archive', write.id), write.record);
+            } else {
+              batch.delete(write.reference);
+            }
+          });
+          await batch.commit();
+        }
+
+        lastRetentionError = '';
+        if (active && expiredTodos.length) {
+          latestData.current = { ...latestData.current, todos: remainingTodos };
+          setData((current) => ({ ...current, todos: current.todos.filter((todo) => !expiredTodoIds.has(todo.id)) }));
+        }
+      } catch (error) {
+        console.error('Eski bajarilgan vazifalarni tozalashda xatolik:', error);
+        if (active && lastRetentionError !== error.message) {
+          lastRetentionError = error.message;
+          setNotice('Eski bajarilgan vazifalarni tozalab bo‘lmadi. Internet aloqasini tekshiring.');
+        }
+      } finally {
+        purgingCompletedTasks = false;
+      }
+    };
+
+    purgeCompletedTasks();
+    const intervalId = window.setInterval(purgeCompletedTasks, 24 * 60 * 60 * 1000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [dataLoading, user]);
+
   const stats = useMemo(() => ({
     done: data.todos.filter((todo) => todo.status === 'done').length,
     pending: data.todos.filter((todo) => todo.status === 'open').length,
@@ -293,13 +410,58 @@ function App() {
     if (!['todos', 'habits'].includes(field)) {
       throw new Error('Noma’lum ma’lumot turi.');
     }
-    await updateDoc(doc(db, 'users', user.uid), { [field]: value });
+    if (field === 'todos') {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', user.uid), { todos: value });
+      const previousTodos = new Map(latestData.current.todos.map((todo) => [todo.id, todo]));
+      value.forEach((todo) => {
+        const previousTodo = previousTodos.get(todo.id);
+        if (
+          todo.status === 'done'
+          && todo.completedAt
+          && (previousTodo?.status !== 'done' || previousTodo.completedAt !== todo.completedAt)
+        ) {
+          const archive = getTaskCompletionArchive(user.uid, todo);
+          if (archive) {
+            batch.set(doc(db, 'task_completion_archive', archive.id), archive.data);
+          }
+        }
+      });
+      await batch.commit();
+    } else {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', user.uid), { habits: value });
+      const previousLogs = getHabitCompletionLogs(latestData.current.habits, user.uid);
+      const nextLogs = getHabitCompletionLogs(value, user.uid);
+      nextLogs.forEach((log, id) => {
+        if (!previousLogs.has(id)) {
+          batch.set(doc(db, 'habit_logs', id), { ...log, completedAt: serverTimestamp() });
+        }
+      });
+      previousLogs.forEach((_log, id) => {
+        if (!nextLogs.has(id)) batch.delete(doc(db, 'habit_logs', id));
+      });
+      await batch.commit();
+    }
     setData((current) => ({ ...current, [field]: value }));
   };
 
   const resetUserData = async () => {
     if (!user || auth.currentUser?.uid !== user.uid) {
       throw new Error('Ma’lumotlarni o‘chirish uchun hisobingizga kiring.');
+    }
+
+    const userCollections = ['pomodoro_sessions', 'habit_logs', 'tasks', 'task_completion_archive'];
+    const userCollectionSnapshots = await Promise.all(userCollections.map((name) => (
+      getDocs(query(collection(db, name), where('userId', '==', user.uid)))
+    )));
+    const userDocuments = userCollectionSnapshots.flatMap((snapshot) => snapshot.docs);
+    for (let index = 0; index < userDocuments.length; index += 450) {
+      const batch = writeBatch(db);
+      userDocuments.slice(index, index + 450).forEach((userDocument) => {
+        batch.delete(userDocument.ref);
+      });
+      await batch.commit();
     }
 
     await setDoc(doc(db, 'users', user.uid), {
@@ -361,7 +523,14 @@ function App() {
       ));
       updates.todos = updatedTodos;
     }
-    await updateDoc(doc(db, 'users', user.uid), updates);
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'users', user.uid), updates);
+    batch.set(doc(collection(db, 'pomodoro_sessions')), {
+      userId: user.uid,
+      durationMinutes: minutes,
+      completedAt: serverTimestamp(),
+    });
+    await batch.commit();
     setData((current) => ({
       ...current,
       focusSessions: (current.focusSessions || 0) + 1,
@@ -497,6 +666,7 @@ function App() {
 
   const pages = {
     dashboard: <OverviewPage user={user} data={data} stats={stats} onNavigate={setPage} isLoading={dataLoading} language={language} />,
+    analytics: <Analytics userId={user.uid} habits={data.habits} tasks={data.todos} language={language} />,
     leaderboard: <LeaderboardPage />,
     todo: <TodoPage todos={data.todos} onChange={(todos) => saveCollection('todos', todos)} onStartFocus={startTodoFocus} isLoading={dataLoading} language={language} />,
     habits: <HabitsPage habits={data.habits} onChange={(habits) => saveCollection('habits', habits)} isLoading={dataLoading} language={language} />,

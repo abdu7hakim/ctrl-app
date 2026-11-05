@@ -2,6 +2,7 @@
   "dependencies": {
     "firebase": "^13.1.0",
     "framer-motion": "^14.9.0",
-    "qrcode.react": "^4.2.0"
+    "qrcode.react": "^4.2.0",
+    "recharts": "^3.10.1"
   }
 }

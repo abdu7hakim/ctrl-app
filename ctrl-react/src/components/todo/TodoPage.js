@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createId } from '../../utils/helpers';
 import { isTodoUrgent } from '../../utils/todoDeadlines';
+import { isCompletedTaskOlderThan } from '../../utils/taskRetention';
 import { translate } from '../../utils/language';
 import Skeleton from '../ui/Skeleton';
 
@@ -48,11 +49,12 @@ function TodoPage({ todos, onChange, onStartFocus, isLoading = false, language =
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const visibleTodos = useMemo(() => todos.filter((todo) => {
+  const activeTodos = useMemo(() => todos.filter((todo) => !isCompletedTaskOlderThan(todo, 7, currentTime)), [currentTime, todos]);
+  const visibleTodos = useMemo(() => activeTodos.filter((todo) => {
     const matchesStatus = filter === 'all' || todo.status === filter;
     const matchesQuery = `${todo.title} ${todo.description || ''}`.toLowerCase().includes(query.toLowerCase());
     return matchesStatus && matchesQuery;
-  }), [filter, query, todos]);
+  }), [activeTodos, filter, query]);
 
   const saveTodos = async (nextTodos) => {
     setError('');
@@ -172,7 +174,7 @@ function TodoPage({ todos, onChange, onStartFocus, isLoading = false, language =
       ) : (
       <div className="todo-layout">
         <section className="surface-card todo-list-panel">
-          <div className="todo-toolbar"><div className="filter-tabs" role="group" aria-label={t('Vazifalarni saralash')}>{[['all', 'Barchasi'], ['open', 'Ochiq'], ['done', 'Bajarilgan']].map(([value, label]) => <button key={value} className={filter === value ? 'filter-active' : ''} onClick={() => setFilter(value)}>{t(label)}<span>{value === 'all' ? todos.length : todos.filter((todo) => todo.status === value).length}</span></button>)}</div><label className="search-field"><i className="ph ph-magnifying-glass" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Vazifani qidirish')} /></label></div>
+          <div className="todo-toolbar"><div className="filter-tabs" role="group" aria-label={t('Vazifalarni saralash')}>{[['all', 'Barchasi'], ['open', 'Ochiq'], ['done', 'Bajarilgan']].map(([value, label]) => <button key={value} className={filter === value ? 'filter-active' : ''} onClick={() => setFilter(value)}>{t(label)}<span>{value === 'all' ? activeTodos.length : activeTodos.filter((todo) => todo.status === value).length}</span></button>)}</div><label className="search-field"><i className="ph ph-magnifying-glass" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Vazifani qidirish')} /></label></div>
           <div className="todo-items">
             {visibleTodos.map((todo) => {
               const urgent = isTodoUrgent(todo, currentTime);

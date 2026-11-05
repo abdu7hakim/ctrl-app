@@ -1,10 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { sendPasswordResetEmail } from 'firebase/auth';
+import { googleProvider, signInWithPopup } from '../../firebase';
 import AuthScreen from './AuthScreen';
 
 jest.mock('../../firebase', () => ({
   auth: {},
   db: {},
+  googleProvider: {},
+  signInWithPopup: jest.fn(),
 }));
 
 jest.mock('firebase/auth', () => ({
@@ -22,6 +25,33 @@ jest.mock('firebase/firestore', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   sendPasswordResetEmail.mockResolvedValue();
+});
+
+test('Google sign-in calls Firebase and reports the authenticated profile', async () => {
+  signInWithPopup.mockResolvedValue({
+    user: { uid: 'google-user', email: 'google@example.com', displayName: 'Google User' },
+  });
+  const onAuthenticated = jest.fn();
+  render(<AuthScreen onAuthenticated={onAuthenticated} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Google orqali davom etish' }));
+
+  await waitFor(() => {
+    expect(signInWithPopup).toHaveBeenCalledWith({}, googleProvider);
+    expect(onAuthenticated).toHaveBeenCalledWith({
+      uid: 'google-user',
+      email: 'google@example.com',
+      firstName: 'Google',
+      lastName: 'User',
+    });
+  });
+});
+
+test('Google sign-in shows a cancellation message when the popup fails', async () => {
+  signInWithPopup.mockRejectedValue({ code: 'auth/popup-closed-by-user' });
+  render(<AuthScreen />);
+  fireEvent.click(screen.getByRole('button', { name: 'Google orqali davom etish' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Google bilan kirish bekor qilindi');
 });
 
 async function openLoginResetModal() {

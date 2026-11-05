@@ -18,6 +18,7 @@ const navigation = [
   { id: 'routine', title: 'Kun tartibi', icon: 'ph-calendar-blank' },
   { id: 'focus', title: 'Diqqat vaqti', icon: 'ph-timer' },
   { id: 'leaderboard', title: 'Reyting', icon: 'ph-trophy' },
+  { id: 'analytics', title: 'Statistika', icon: 'ph-chart-line-up' },
   { id: 'profile', title: 'Profil', icon: 'ph-user-circle' },
   { id: 'contact', title: 'Aloqa', icon: 'ph-chat-circle-dots' },
 ];
@@ -29,6 +30,7 @@ const pageTitles = {
   routine: 'Kun tartibi',
   focus: 'Diqqat vaqti',
   leaderboard: 'Reyting',
+  analytics: 'Statistika',
   profile: 'Profil',
   contact: 'Aloqa',
   settings: 'Sozlamalar',
@@ -65,7 +67,6 @@ function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onTogg
             {page === 'settings' && <i className="ph ph-caret-right nav-current" aria-hidden="true" />}
           </button>
           <button className="nav-link logout-link" onClick={onLogout}><i className="ph ph-sign-out" /><span>{t('Chiqish')}</span></button>
-          <span className="sidebar-version">{t('CTRL App · Shaxsiy unumdorlik')}</span>
         </div>
       </aside>
       <main className={`main-area ${page === 'leaderboard' ? 'main-area-leaderboard' : ''}`}>
