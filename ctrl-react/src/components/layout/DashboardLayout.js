@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarCheck, CheckSquare, Home, Timer, Trophy } from 'lucide-react';
 import { translate } from '../../utils/language';
 import { getAvatarInitials } from '../../utils/avatars';
@@ -39,6 +39,11 @@ const pageTitles = {
 function DashboardLayout({ user, page, darkMode, themeSaving, onNavigate, onToggleTheme, onLogout, language = 'uz', onChangeLanguage, children }) {
   const t = (text) => translate(text, language);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [page]);
 
   const navigate = (id) => {
     onNavigate(id);

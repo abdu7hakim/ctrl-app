@@ -99,6 +99,22 @@ test('keeps weekly values visible and toggles detailed habit information separat
   expect(summary).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('mobile add-habit prompt scrolls to the form without creating a habit', () => {
+  const scrollIntoView = jest.fn();
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  const onChange = jest.fn();
+  render(<HabitsPage habits={[]} onChange={onChange} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Yangi odat' }));
+
+  expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Odat nomi')).not.toHaveFocus();
+  if (originalScrollIntoView) HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+  else delete HTMLElement.prototype.scrollIntoView;
+});
+
 test('creates a habit with a selected icon and selected weekdays', async () => {
   jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
   const onChange = jest.fn().mockResolvedValue();

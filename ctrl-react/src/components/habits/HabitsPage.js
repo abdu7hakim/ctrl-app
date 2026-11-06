@@ -47,6 +47,7 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
   const t = (text) => translate(text, language);
   const dayLabel = (count) => language === 'en' ? t(count === 1 ? 'kun' : 'kunlar') : 'kun';
   const nameInputRef = useRef(null);
+  const addHabitRef = useRef(null);
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
   const [reason, setReason] = useState('');
@@ -165,6 +166,11 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
 
   const removeHabit = (id) => saveHabits(habits.filter((habit) => habit.id !== id));
   const toggleHabitDetails = (id) => setExpandedHabitId((current) => (current === id ? null : id));
+  const scrollToHabitForm = () => addHabitRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  const focusHabitForm = () => {
+    scrollToHabitForm();
+    nameInputRef.current?.focus({ preventScroll: true });
+  };
 
   return (
     <div className={`page-content ${isLoading ? 'page-content-loading' : 'page-content-loaded'}`}>
@@ -196,6 +202,11 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
           </aside>
         </div>
       ) : (
+      <>
+      <div className="mobile-add-prompt">
+        <p>{t('Yangi odat qo‘shishni xohlaysizmi?')}</p>
+        <button type="button" className="button button-primary" onClick={scrollToHabitForm}><i className="ph ph-plus" /> {t('Yangi odat')}</button>
+      </div>
       <div className="habits-layout">
         <section className="surface-card habits-list-card"><div className="section-heading"><div><span className="eyebrow">{t('BUGUN')}</span><h3>{t('Odatlarim')} <span className="heading-count">{doneCount}/{todayHabits.length}</span></h3></div><div className="habit-progress"><span className="habit-progress-ring" style={{ '--progress': `${todayHabits.length ? (doneCount / todayHabits.length) * 100 : 0}%` }}><strong>{todayHabits.length ? Math.round((doneCount / todayHabits.length) * 100) : 0}<small>%</small></strong></span><span>{t('Bugungi natija')}</span></div></div>
           {habits.length ? <div className="habit-list">{habits.map((habit) => {
@@ -315,10 +326,10 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
               <path d="m184 60 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#7157e8" />
             </svg>
             <h4>{t('Hali odatlaringiz yo‘q.')}</h4>
-            <button type="button" className="button button-primary" onClick={() => nameInputRef.current?.focus()}><i className="ph ph-plus" /> {t('Birinchi odatni qo‘shish')}</button>
+            <button type="button" className="button button-primary" onClick={focusHabitForm}><i className="ph ph-plus" /> {t('Birinchi odatni qo‘shish')}</button>
           </div>}
         </section>
-        <aside className="surface-card add-task-card"><h3>{t(editingId ? 'Odatni yangilang' : 'Yangi odat')}</h3>
+        <aside className="surface-card add-task-card" ref={addHabitRef}><h3>{t(editingId ? 'Odatni yangilang' : 'Yangi odat')}</h3>
           <form className="form-stack" onSubmit={editingId ? saveEdit : addHabit}>
             <label>{t('Odat nomi')}<input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder={t('Masalan, ertalab sayr')} maxLength="100" required disabled={saving} /></label>
             <label>{t('Maqsad')} <span className="optional">{t('(ixtiyoriy)')}</span><input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder={t('Masalan, 20 daqiqa')} maxLength="100" disabled={saving} /></label>
@@ -332,6 +343,7 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
           </form>
         </aside>
       </div>
+      </>
       )}
     </div>
   );
