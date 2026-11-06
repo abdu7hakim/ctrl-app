@@ -17,6 +17,16 @@ import { isTodoOverdue } from './utils/todoDeadlines';
 import { getTaskCompletionArchive, isCompletedTaskOlderThan } from './utils/taskRetention';
 import { clearStoredAvatar, getStoredAvatar } from './utils/avatars';
 import { getStoredLanguage, saveStoredLanguage, translate } from './utils/language';
+import {
+  calculateFocusXP,
+  calculateHabitXP,
+  calculateTaskXP,
+  getHabitStreak,
+  getHabitXpLogId,
+  getLocalDateKey,
+  getTaskXpLogId,
+} from './utils/xp';
+import { playXpRewardSound } from './utils/xpSound';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -26,6 +36,7 @@ import {
   getDocs,
   increment,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -67,6 +78,27 @@ function getHabitCompletionLogs(habits, userId) {
   return logs;
 }
 
+function getLogDateKey(value) {
+  if (typeof value?.toDate === 'function') return getLocalDateKey(value.toDate());
+  if (value instanceof Date) return getLocalDateKey(value);
+  if (typeof value === 'string') {
+    const dateOnly = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+    if (dateOnly) return dateOnly[1];
+  }
+  return '';
+}
+
+function findLegacyXpLog(logs, { type, date, amount, description }, consumedLogIds) {
+  return logs.find((log) => (
+    log.type === type
+    && !consumedLogIds.has(log.id)
+    && !log.sourceId
+    && getLogDateKey(log.createdAt) === date
+    && Number(log.amount) === amount
+    && log.description === description
+  ));
+}
+
 function getNameParts(displayName, email) {
   const [firstName = '', ...lastNameParts] = (displayName || '').trim().split(/\s+/);
   return {
@@ -84,6 +116,7 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [colorTheme, setColorTheme] = useState(defaultThemeId);
   const [notice, setNotice] = useState('');
+  const [xpNotice, setXpNotice] = useState(null);
   const [themeSaving, setThemeSaving] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -94,6 +127,15 @@ function App() {
   const latestData = useRef(data);
   const expiryErrorKey = useRef('');
   const focusTaskStarter = useRef(null);
+  const xpNoticeSequence = useRef(0);
+
+  const showXpNotice = useCallback((amount, reason) => {
+    if (amount > 0) {
+      xpNoticeSequence.current += 1;
+      setXpNotice({ amount, id: xpNoticeSequence.current, reason });
+      playXpRewardSound();
+    }
+  }, []);
 
   useEffect(() => {
     if (page === 'focus') setFocusPageVisible(true);
@@ -213,6 +255,31 @@ function App() {
               await setDoc(userRef, missingProfile, { merge: true });
             }
           }
+          const loginDate = getLocalDateKey();
+          const loginLogRef = doc(collection(db, 'users', firebaseUser.uid, 'xp_logs'));
+          const loginResult = await runTransaction(db, async (transaction) => {
+            const currentProfile = await transaction.get(userRef);
+            const currentProfileData = currentProfile.data() || {};
+            const currentTotalXP = Number.isFinite(currentProfileData.totalXP) ? currentProfileData.totalXP : 0;
+            if (currentProfileData.lastDailyLoginDate === loginDate) {
+              return { awarded: false, totalXP: currentTotalXP };
+            }
+            transaction.update(userRef, {
+              totalXP: currentTotalXP + 2,
+              lastDailyLoginDate: loginDate,
+            });
+            transaction.set(loginLogRef, {
+              amount: 2,
+              type: 'Login',
+              description: 'Kunlik login',
+              createdAt: serverTimestamp(),
+            });
+            return { awarded: true, totalXP: currentTotalXP + 2 };
+          });
+          nextData.totalXP = loginResult.totalXP;
+          if (loginResult.awarded && active && generation === authGeneration.current) {
+            showXpNotice(2, 'Kunlik kirish uchun');
+          }
           if (active && generation === authGeneration.current) {
             setUser({
               ...identity,
@@ -254,7 +321,7 @@ function App() {
       authGeneration.current += 1;
       unsubscribe();
     };
-  }, [reloadKey]);
+  }, [reloadKey, showXpNotice]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -410,12 +477,86 @@ function App() {
     if (!['todos', 'habits'].includes(field)) {
       throw new Error('Noma’lum ma’lumot turi.');
     }
+    let xpChange = 0;
     if (field === 'todos') {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'users', user.uid), { todos: value });
       const previousTodos = new Map(latestData.current.todos.map((todo) => [todo.id, todo]));
-      value.forEach((todo) => {
+      const updatedTodos = value.map((todo) => ({ ...todo }));
+      const legacyUndoCandidates = updatedTodos.filter((todo) => (
+        previousTodos.get(todo.id)?.status === 'done'
+        && todo.status !== 'done'
+        && !Number.isFinite(previousTodos.get(todo.id)?.xpAwardAmount)
+      ));
+      const legacyLogs = legacyUndoCandidates.length
+        ? (await getDocs(collection(db, 'users', user.uid, 'xp_logs'))).docs.map((logDocument) => ({
+          ...logDocument.data(),
+          id: logDocument.id,
+          reference: logDocument.ref,
+        }))
+        : [];
+      const consumedLegacyLogIds = new Set();
+      const batch = writeBatch(db);
+      const taskRewards = [];
+      const taskRefunds = [];
+      updatedTodos.forEach((todo) => {
         const previousTodo = previousTodos.get(todo.id);
+        if (todo.status === 'done' && previousTodo?.status !== 'done') {
+          if (!Number.isFinite(todo.xpAwardAmount)) {
+            const amount = calculateTaskXP(todo.priority);
+            const normalizedPriority = String(todo.priority || '').trim().toLowerCase();
+            const priorityName = normalizedPriority === 'high' || normalizedPriority === 'yuqori'
+              ? 'Yuqori'
+              : normalizedPriority === 'low' || normalizedPriority === 'past'
+                ? 'Past'
+                : 'O‘rta';
+            const date = todo.completedAt || getLocalDateKey();
+            todo.xpAwardAmount = amount;
+            todo.xpAwardDate = date;
+            taskRewards.push({
+              id: getTaskXpLogId(todo.id),
+              sourceId: todo.id,
+              sourceDate: date,
+              amount,
+              type: 'Task',
+              description: `${priorityName} prioritetli topshiriq bajarildi`,
+            });
+          }
+        } else if (previousTodo?.status === 'done' && todo.status !== 'done') {
+          let amount = previousTodo.xpAwardAmount;
+          let date = previousTodo.xpAwardDate || previousTodo.completedAt || getLocalDateKey();
+          let legacyLog;
+          if (!Number.isFinite(amount)) {
+            const normalizedPriority = String(previousTodo.priority || '').trim().toLowerCase();
+            const priorityName = normalizedPriority === 'high' || normalizedPriority === 'yuqori'
+              ? 'Yuqori'
+              : normalizedPriority === 'low' || normalizedPriority === 'past'
+                ? 'Past'
+                : 'O‘rta';
+            amount = calculateTaskXP(previousTodo.priority);
+            legacyLog = findLegacyXpLog(legacyLogs, {
+              type: 'Task',
+              date,
+              amount,
+              description: `${priorityName} prioritetli topshiriq bajarildi`,
+            }, consumedLegacyLogIds);
+            if (!legacyLog) amount = 0;
+            else {
+              consumedLegacyLogIds.add(legacyLog.id);
+              date = getLogDateKey(legacyLog.createdAt) || date;
+            }
+            todo.xpAwardAmount = amount;
+            todo.xpAwardDate = date;
+          }
+          if (amount > 0) {
+            taskRefunds.push({ id: todo.id, amount });
+            batch.delete(legacyLog?.reference || doc(
+              db,
+              'users',
+              user.uid,
+              'xp_logs',
+              getTaskXpLogId(todo.id),
+            ));
+          }
+        }
         if (
           todo.status === 'done'
           && todo.completedAt
@@ -427,23 +568,143 @@ function App() {
           }
         }
       });
+      const taskXPChange = taskRewards.reduce((total, reward) => total + reward.amount, 0)
+        - taskRefunds.reduce((total, refund) => total + refund.amount, 0);
+      xpChange = taskXPChange;
+      batch.update(doc(db, 'users', user.uid), {
+        todos: updatedTodos,
+        ...(taskXPChange ? { totalXP: increment(taskXPChange) } : {}),
+      });
+      taskRewards.forEach((reward) => {
+        const { id, ...log } = reward;
+        batch.set(doc(db, 'users', user.uid, 'xp_logs', id), {
+          ...log,
+          createdAt: serverTimestamp(),
+        });
+      });
       await batch.commit();
+      if (taskRewards.length) {
+        const amount = taskRewards.reduce((total, reward) => total + reward.amount, 0);
+        showXpNotice(
+          amount,
+          taskRewards.length > 1 ? 'Vazifalarni bajarganingiz uchun' : 'Vazifani bajarganingiz uchun',
+        );
+      }
+      value = updatedTodos;
     } else {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'users', user.uid), { habits: value });
+      const previousHabits = new Map(latestData.current.habits.map((habit) => [habit.id, habit]));
+      const updatedHabits = value.map((habit) => ({
+        ...habit,
+        xpAwardedDates: { ...(habit.xpAwardedDates || {}) },
+      }));
       const previousLogs = getHabitCompletionLogs(latestData.current.habits, user.uid);
-      const nextLogs = getHabitCompletionLogs(value, user.uid);
+      const nextLogs = getHabitCompletionLogs(updatedHabits, user.uid);
+      const newlyUndoneLogs = Array.from(previousLogs, ([id, log]) => (
+        !nextLogs.has(id) && !Number.isFinite(previousHabits.get(log.habitId)?.xpAwardedDates?.[log.date])
+          ? { ...log, id }
+          : null
+      )).filter(Boolean);
+      const legacyLogs = newlyUndoneLogs.length
+        ? (await getDocs(collection(db, 'users', user.uid, 'xp_logs'))).docs.map((logDocument) => ({
+          ...logDocument.data(),
+          id: logDocument.id,
+          reference: logDocument.ref,
+        }))
+        : [];
+      const consumedLegacyLogIds = new Set();
+      const batch = writeBatch(db);
+      const nextHabits = new Map(updatedHabits.map((habit) => [habit.id, habit]));
+      const habitRefunds = [];
+      const habitRewards = [];
       nextLogs.forEach((log, id) => {
         if (!previousLogs.has(id)) {
           batch.set(doc(db, 'habit_logs', id), { ...log, completedAt: serverTimestamp() });
+          const habit = nextHabits.get(log.habitId);
+          if (habit && !Number.isFinite(habit.xpAwardedDates[log.date])) {
+            const [year, month, day] = log.date.split('-').map(Number);
+            const completionDate = new Date(year, month - 1, day);
+            const streak = getHabitStreak(habit.completions, completionDate, habit.frequency);
+            const reward = {
+              id: getHabitXpLogId(log.habitId, log.date),
+              sourceId: log.habitId,
+              sourceDate: log.date,
+              amount: calculateHabitXP(streak),
+              type: 'Habit',
+              description: `Kunlik habit bajarildi (Streak: ${streak} kun)`,
+            };
+            habit.xpAwardedDates[log.date] = reward.amount;
+            habitRewards.push(reward);
+          }
         }
       });
-      previousLogs.forEach((_log, id) => {
-        if (!nextLogs.has(id)) batch.delete(doc(db, 'habit_logs', id));
+      previousLogs.forEach((log, id) => {
+        if (!nextLogs.has(id)) {
+          batch.delete(doc(db, 'habit_logs', id));
+          const habit = nextHabits.get(log.habitId);
+          if (!habit) return;
+          const previousHabit = previousHabits.get(log.habitId);
+          let amount = previousHabit?.xpAwardedDates?.[log.date];
+          let legacyLog;
+          if (!Number.isFinite(amount)) {
+            const [year, month, day] = log.date.split('-').map(Number);
+            const completionDate = new Date(year, month - 1, day);
+            const streak = getHabitStreak(
+              previousHabit?.completions,
+              completionDate,
+              previousHabit?.frequency,
+            );
+            amount = calculateHabitXP(streak);
+            legacyLog = findLegacyXpLog(legacyLogs, {
+              type: 'Habit',
+              date: log.date,
+              amount,
+              description: `Kunlik habit bajarildi (Streak: ${streak} kun)`,
+            }, consumedLegacyLogIds);
+            if (!legacyLog) amount = 0;
+            else consumedLegacyLogIds.add(legacyLog.id);
+            if (habit) habit.xpAwardedDates[log.date] = amount;
+          } else {
+            batch.delete(doc(
+              db,
+              'users',
+              user.uid,
+              'xp_logs',
+              getHabitXpLogId(log.habitId, log.date),
+            ));
+          }
+          if (legacyLog) batch.delete(legacyLog.reference);
+          if (amount > 0) habitRefunds.push({ id, amount });
+        }
+      });
+      const habitXPChange = habitRewards.reduce((total, reward) => total + reward.amount, 0)
+        - habitRefunds.reduce((total, refund) => total + refund.amount, 0);
+      xpChange = habitXPChange;
+      batch.update(doc(db, 'users', user.uid), {
+        habits: updatedHabits,
+        ...(habitXPChange ? { totalXP: increment(habitXPChange) } : {}),
+      });
+      habitRewards.forEach((reward) => {
+        const { id, ...log } = reward;
+        batch.set(doc(db, 'users', user.uid, 'xp_logs', id), {
+          ...log,
+          createdAt: serverTimestamp(),
+        });
       });
       await batch.commit();
+      if (habitRewards.length) {
+        const amount = habitRewards.reduce((total, reward) => total + reward.amount, 0);
+        showXpNotice(
+          amount,
+          habitRewards.length > 1 ? 'Odatlarni bajarganingiz uchun' : 'Odatni bajarganingiz uchun',
+        );
+      }
+      value = updatedHabits;
     }
-    setData((current) => ({ ...current, [field]: value }));
+    setData((current) => ({
+      ...current,
+      [field]: value,
+      ...(xpChange ? { totalXP: (Number(current.totalXP) || 0) + xpChange } : {}),
+    }));
   };
 
   const resetUserData = async () => {
@@ -452,10 +713,13 @@ function App() {
     }
 
     const userCollections = ['pomodoro_sessions', 'habit_logs', 'tasks', 'task_completion_archive'];
-    const userCollectionSnapshots = await Promise.all(userCollections.map((name) => (
-      getDocs(query(collection(db, name), where('userId', '==', user.uid)))
-    )));
-    const userDocuments = userCollectionSnapshots.flatMap((snapshot) => snapshot.docs);
+    const [userCollectionSnapshots, xpLogSnapshot] = await Promise.all([
+      Promise.all(userCollections.map((name) => (
+        getDocs(query(collection(db, name), where('userId', '==', user.uid)))
+      ))),
+      getDocs(collection(db, 'users', user.uid, 'xp_logs')),
+    ]);
+    const userDocuments = [...userCollectionSnapshots.flatMap((snapshot) => snapshot.docs), ...xpLogSnapshot.docs];
     for (let index = 0; index < userDocuments.length; index += 450) {
       const batch = writeBatch(db);
       userDocuments.slice(index, index + 450).forEach((userDocument) => {
@@ -513,6 +777,7 @@ function App() {
     const updates = {
       focusSessions: increment(1),
       focusMinutes: increment(minutes),
+      totalXP: increment(calculateFocusXP(minutes)),
     };
     let updatedTodos = latestData.current.todos;
     if (todoId) {
@@ -525,12 +790,19 @@ function App() {
     }
     const batch = writeBatch(db);
     batch.update(doc(db, 'users', user.uid), updates);
+    batch.set(doc(collection(db, 'users', user.uid, 'xp_logs')), {
+      amount: calculateFocusXP(minutes),
+      type: 'Focus',
+      description: `${minutes} daqiqa fokus bajarildi`,
+      createdAt: serverTimestamp(),
+    });
     batch.set(doc(collection(db, 'pomodoro_sessions')), {
       userId: user.uid,
       durationMinutes: minutes,
       completedAt: serverTimestamp(),
     });
     await batch.commit();
+    showXpNotice(calculateFocusXP(minutes), 'Fokus qilganingiz uchun');
     setData((current) => ({
       ...current,
       focusSessions: (current.focusSessions || 0) + 1,
@@ -742,6 +1014,28 @@ function App() {
           />
         </motion.div>
       </DashboardLayout>
+      <AnimatePresence>
+        {xpNotice && (
+          <motion.div
+            key={xpNotice.id}
+            className="xp-toast"
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: -18, scale: 0.92 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [-18, 0, 0, -10], scale: [0.92, 1, 1, 0.98] }}
+            transition={{ duration: 2.8, times: [0, 0.16, 0.82, 1], ease: 'easeInOut' }}
+            onAnimationComplete={() => setXpNotice((current) => (
+              current?.id === xpNotice.id ? null : current
+            ))}
+          >
+            <span className="xp-toast-icon"><i className="ph ph-sparkle" aria-hidden="true" /></span>
+            <span className="xp-toast-copy">
+              <span>{translate(xpNotice.reason, language)}</span>
+              <strong>+ {xpNotice.amount} XP</strong>
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {notice && <div className="toast" role="status">{translate(notice, language)}</div>}
     </>
   );

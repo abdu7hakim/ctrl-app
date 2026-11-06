@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { createId } from '../../utils/helpers';
 import { translate } from '../../utils/language';
+import { getHabitStreak } from '../../utils/xp';
 import Skeleton from '../ui/Skeleton';
 
 const colors = ['#7157e8', '#e47070', '#e9a23b', '#39a982', '#4b91d1', '#d35ca3'];
@@ -40,27 +41,6 @@ const getWeekDays = (date) => {
     day.setDate(today.getDate() - mondayOffset + index);
     return { date: day, key: dateKey(day), label: weekdayNames[index] };
   });
-};
-
-const getCurrentStreak = (completions, today, frequency) => {
-  const checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (frequency.includes(getWeekdayIndex(checkDate)) && !completions?.[dateKey(checkDate)]) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  let streak = 0;
-  let daysChecked = 0;
-
-  while (daysChecked < 366) {
-    if (frequency.includes(getWeekdayIndex(checkDate))) {
-      if (!completions?.[dateKey(checkDate)]) break;
-      streak += 1;
-    }
-    checkDate.setDate(checkDate.getDate() - 1);
-    daysChecked += 1;
-  }
-
-  return streak;
 };
 
 function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
@@ -222,7 +202,7 @@ function HabitsPage({ habits, onChange, isLoading = false, language = 'uz' }) {
             const completed = Boolean(habit.completions?.[today]);
             const habitFrequency = getHabitFrequency(habit);
             const scheduledToday = habitFrequency.includes(getWeekdayIndex(currentDate));
-            const streak = getCurrentStreak(habit.completions, currentDate, habitFrequency);
+            const streak = getHabitStreak(habit.completions, currentDate, habitFrequency);
             const createdDate = habit.createdAt ? new Date(habit.createdAt) : weekDays[0].date;
             const createdDateKey = Number.isNaN(createdDate.getTime()) ? weekDays[0].key : dateKey(createdDate);
             const activeWeekDays = weekDays.filter((day) => (

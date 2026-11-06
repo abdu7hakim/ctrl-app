@@ -1,12 +1,15 @@
 import { act, render, screen, within } from '@testing-library/react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import Analytics, { getWeekRange } from './Analytics';
 
 jest.mock('../../firebase', () => ({ db: {} }));
 
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((_db, name) => ({ name })),
+  doc: jest.fn((_db, ...segments) => ({ name: segments.join('/') })),
+  getDoc: jest.fn(),
   getDocs: jest.fn(),
+  orderBy: jest.fn((field, direction) => ({ field, direction })),
   query: jest.fn((collectionRef, ...constraints) => ({ collectionRef, constraints })),
   where: jest.fn((field, operator, value) => ({ field, operator, value })),
 }));
@@ -32,7 +35,10 @@ function getWeekDateKey(offset = 0) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  collection.mockImplementation((_db, name) => ({ name }));
+  collection.mockImplementation((_db, ...segments) => ({ name: segments.join('/') }));
+  doc.mockImplementation((_db, ...segments) => ({ name: segments.join('/') }));
+  getDoc.mockResolvedValue({ exists: () => true, data: () => ({ totalXP: 42 }) });
+  orderBy.mockImplementation((field, direction) => ({ field, direction }));
   query.mockImplementation((collectionRef, ...constraints) => ({ collectionRef, constraints }));
   where.mockImplementation((field, operator, value) => ({ field, operator, value }));
   getDocs.mockImplementation(() => Promise.resolve(makeSnapshot([])));
@@ -56,15 +62,23 @@ test('loads this user’s sessions, habit logs, and tasks into the weekly charts
       { id: 'task-3', priority: 'low' },
       { id: 'task-4', priority: 'high' },
     ],
+    'users/user-1/xp_logs': [],
   };
-  getDocs.mockImplementation(({ collectionRef }) => Promise.resolve(
-    makeSnapshot(collectionRecords[collectionRef.name]),
+  getDocs.mockImplementation((reference) => Promise.resolve(
+    makeSnapshot(collectionRecords[reference.collectionRef?.name || reference.name] || []),
   ));
 
   render(<Analytics userId="user-1" />);
 
   const charts = await screen.findByRole('region', { name: 'Haftalik grafiklar' });
-  expect(getDocs).toHaveBeenCalledTimes(3);
+  expect(getDocs).toHaveBeenCalledTimes(4);
+  expect(getDocs).toHaveBeenCalledWith(
+    query(
+      { name: 'users/user-1/xp_logs' },
+      { field: 'createdAt', direction: 'desc' },
+    ),
+  );
+  expect(getDoc).toHaveBeenCalledWith({ name: 'users/user-1' });
   ['pomodoro_sessions', 'habit_logs', 'tasks'].forEach((name) => {
     expect(collection).toHaveBeenCalledWith({}, name);
     expect(query).toHaveBeenCalledWith(
@@ -79,6 +93,28 @@ test('loads this user’s sessions, habit logs, and tasks into the weekly charts
   expect(document.querySelectorAll('.analytics-summary-card strong')[1]).toHaveTextContent('2');
   expect(document.querySelectorAll('.analytics-summary-card strong')[2]).toHaveTextContent('4');
   expect(within(charts).getAllByText(/50%/)).toHaveLength(1);
+});
+
+test('shows XP log entries in descending date order', async () => {
+  const collectionRecords = {
+    'users/user-1/xp_logs': [
+      { id: 'older', amount: 2, type: 'Login', description: 'Kunlik login', createdAt: '2026-11-05T08:00:00' },
+      { id: 'newer', amount: 10, type: 'Focus', description: '25 daqiqa fokus bajarildi', createdAt: '2026-11-06T09:00:00' },
+    ],
+  };
+  getDocs.mockImplementation((reference) => Promise.resolve(
+    makeSnapshot(collectionRecords[reference.collectionRef?.name || reference.name] || []),
+  ));
+
+  render(<Analytics userId="user-1" />);
+
+  const history = await screen.findByRole('region', { name: 'XP tarixi' });
+  const entries = within(history).getAllByRole('listitem');
+  expect(entries[0]).toHaveTextContent('25 daqiqa fokus bajarildi');
+  expect(entries[0]).toHaveTextContent('+ 10 XP');
+  expect(entries[1]).toHaveTextContent('Kunlik login');
+  expect(within(history).getByText('+ 10 XP')).toBeInTheDocument();
+  expect(screen.getByLabelText('Umumiy XP')).toHaveTextContent('42 XP');
 });
 
 test('shows skeleton cards while Firestore analytics queries are pending', async () => {

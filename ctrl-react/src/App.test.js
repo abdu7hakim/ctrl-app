@@ -7,7 +7,9 @@ import {
   getDoc,
   getDocs,
   increment,
+  orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -29,8 +31,10 @@ import { colorThemes } from './utils/themes';
 import { getTodoDeadline, isTodoOverdue, isTodoUrgent } from './utils/todoDeadlines';
 import { createFocusMusic, focusMusicOptions } from './utils/focusMusic';
 import { getDailyMotivation, motivationalQuotes } from './utils/motivation';
+import { getLocalDateKey } from './utils/xp';
 
 const originalAudioContext = window.AudioContext;
+jest.setTimeout(15000);
 
 jest.mock('./firebase', () => ({
   auth: { currentUser: { uid: 'user-1', email: 'aziza@example.com' } },
@@ -57,7 +61,9 @@ jest.mock('firebase/firestore', () => ({
   getDoc: jest.fn(),
   getDocs: jest.fn().mockResolvedValue({ docs: [] }),
   increment: jest.fn((amount) => ({ increment: amount })),
+  orderBy: jest.fn((field, direction) => ({ field, direction })),
   query: jest.fn((collectionRef, ...constraints) => ({ collectionRef, constraints })),
+  runTransaction: jest.fn(),
   serverTimestamp: jest.fn(() => 'server-timestamp'),
   setDoc: jest.fn().mockResolvedValue(),
   updateDoc: jest.fn().mockResolvedValue(),
@@ -94,6 +100,13 @@ beforeEach(() => {
   collection.mockImplementation((_db, name) => ({ name }));
   increment.mockImplementation((amount) => ({ increment: amount }));
   query.mockImplementation((collectionRef, ...constraints) => ({ collectionRef, constraints }));
+  runTransaction.mockImplementation(async (_db, updateFunction) => updateFunction({
+    get: jest.fn().mockResolvedValue({
+      data: () => ({ lastDailyLoginDate: getLocalDateKey() }),
+    }),
+    update: jest.fn(),
+    set: jest.fn(),
+  }));
   serverTimestamp.mockReturnValue('server-timestamp');
   updateDoc.mockResolvedValue();
   getDocs.mockResolvedValue({ docs: [] });
@@ -257,7 +270,7 @@ test('analytics page is reachable from the sidebar and shows all three charts', 
   expect(within(analyticsPage).getByRole('heading', { name: 'Haftalik bajarilgan odatlar' })).toBeInTheDocument();
   expect(within(analyticsPage).getByRole('heading', { name: 'Vazifalar ustuvorligi' })).toBeInTheDocument();
   expect(await screen.findAllByText('Bu hafta uchun ma’lumot yo‘q')).toHaveLength(2);
-  expect(getDocs).toHaveBeenCalledTimes(4);
+  expect(getDocs).toHaveBeenCalledTimes(5);
   expect(query).toHaveBeenCalledWith(
     { name: 'pomodoro_sessions' },
     { field: 'userId', operator: '==', value: 'user-1' },
@@ -363,6 +376,90 @@ test('loads saved routine tasks and custom badges from the user document', async
   expect(screen.getByText('Learning', { selector: '.routine-badge' })).toHaveClass('routine-badge-indigo');
 });
 
+test('awards the daily login XP once through a Firestore transaction', async () => {
+  const transaction = {
+    get: jest.fn().mockResolvedValue({ data: () => ({ totalXP: 6 }) }),
+    update: jest.fn(),
+    set: jest.fn(),
+  };
+  runTransaction.mockImplementation(async (_db, updateFunction) => updateFunction(transaction));
+
+  render(<App />);
+
+  await waitFor(() => expect(transaction.update).toHaveBeenCalledWith(
+    { name: 'users', id: 'user-1' },
+    { totalXP: 8, lastDailyLoginDate: getLocalDateKey() },
+  ));
+  expect(transaction.set).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      amount: 2,
+      type: 'Login',
+      description: 'Kunlik login',
+      createdAt: 'server-timestamp',
+    }),
+  );
+});
+
+test('awards habit XP using the current completion streak', async () => {
+  const today = new Date();
+  const completions = {};
+  [1, 2].forEach((daysAgo) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - daysAgo);
+    completions[getLocalDateKey(date)] = true;
+  });
+  getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({
+      ...storedData,
+      habits: [{
+        id: 'habit-1',
+        name: 'Daily reading',
+        frequency: [0, 1, 2, 3, 4, 5, 6],
+        completions,
+      }],
+    }),
+  });
+
+  await openPage('Odatlar');
+  fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
+
+  await waitFor(() => {
+    const habitBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+    expect(habitBatch.update.mock.calls[0][1].totalXP).toEqual({ increment: 3 });
+    expect(habitBatch.set).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        amount: 3,
+        type: 'Habit',
+        description: 'Kunlik habit bajarildi (Streak: 3 kun)',
+      }),
+    );
+  });
+
+  const habitUndoButton = await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' });
+  await waitFor(() => expect(habitUndoButton).toBeEnabled());
+  fireEvent.click(habitUndoButton);
+  await waitFor(() => {
+    const undoBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+    expect(undoBatch.update.mock.calls[0][1].totalXP).toEqual({ increment: -3 });
+    expect(undoBatch.delete).toHaveBeenCalled();
+  });
+
+  const habitRedoButton = await screen.findByRole('button', { name: 'Bajarildi deb belgilash' });
+  await waitFor(() => expect(habitRedoButton).toBeEnabled());
+  fireEvent.click(habitRedoButton);
+  await waitFor(() => {
+    const redoBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+    expect(redoBatch.update.mock.calls[0][1]).not.toHaveProperty('totalXP');
+    expect(redoBatch.set).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'Habit' }),
+    );
+  });
+});
+
 test('todo creation, completion, and deletion are persisted to the signed-in user document', async () => {
   await openPage('Vazifalar');
   expect(screen.getAllByRole('heading', { name: 'Vazifalar' })).toHaveLength(1);
@@ -383,8 +480,10 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
   expect(await screen.findByRole('heading', { name: 'React ilovasini o‘rganish' })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Bajarildi deb belgilash' }));
-  expect(await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' })).toBeInTheDocument();
+  await waitFor(() => expect(writeBatch).toHaveBeenCalledTimes(3));
   taskBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(taskBatch.update.mock.calls[0][1].todos[0].status).toBe('done');
+  expect(await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' })).toBeInTheDocument();
   const completedTask = taskBatch.update.mock.calls[0][1].todos[0];
   const todayKey = (() => {
     const today = new Date();
@@ -395,9 +494,36 @@ test('todo creation, completion, and deletion are persisted to the signed-in use
     { name: 'task_completion_archive', id: `user-1_${completedTask.id}_${todayKey}` },
     { userId: 'user-1', taskId: completedTask.id, completedAt: todayKey, priority: 'medium' },
   );
+  expect(taskBatch.update.mock.calls[0][1].totalXP).toEqual({ increment: 2 });
+  expect(taskBatch.set).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      amount: 2,
+      type: 'Task',
+      description: 'O‘rta prioritetli topshiriq bajarildi',
+      createdAt: 'server-timestamp',
+    }),
+  );
+  const taskUndoButton = screen.getByRole('button', { name: 'Bajarilmagan deb belgilash' });
+  fireEvent.click(taskUndoButton);
+  const taskRedoButton = await screen.findByRole('button', { name: 'Bajarildi deb belgilash' });
+  await waitFor(() => expect(taskRedoButton).toBeEnabled());
+  taskBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(taskBatch.update.mock.calls[0][1].totalXP).toEqual({ increment: -2 });
+  expect(taskBatch.delete).toHaveBeenCalled();
+
+  fireEvent.click(taskRedoButton);
+  const taskCompletedButton = await screen.findByRole('button', { name: 'Bajarilmagan deb belgilash' });
+  await waitFor(() => expect(taskCompletedButton).toBeEnabled());
+  taskBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
+  expect(taskBatch.update.mock.calls[0][1]).not.toHaveProperty('totalXP');
+  expect(taskBatch.set).not.toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ type: 'Task' }),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'React ilovasini o‘rganish vazifasini o‘chirish' }));
   expect(await screen.findByText('Bu ro‘yxatda hali vazifa yo‘q.')).toBeInTheDocument();
-}, 10000);
+}, 30000);
 
 test('todo completion activity date is cleared when a task is reopened', async () => {
   const onChange = jest.fn().mockResolvedValue();
@@ -820,14 +946,19 @@ test('a completed focus session uses Firestore atomic increments', async () => {
 
   expect(increment).toHaveBeenNthCalledWith(1, 1);
   expect(increment).toHaveBeenNthCalledWith(2, 25);
+  expect(increment).toHaveBeenNthCalledWith(3, 10);
   const focusBatch = writeBatch.mock.results[writeBatch.mock.results.length - 1].value;
   expect(focusBatch.update).toHaveBeenCalledWith(
     expect.anything(),
-    { focusSessions: { increment: 1 }, focusMinutes: { increment: 25 } },
+    { focusSessions: { increment: 1 }, focusMinutes: { increment: 25 }, totalXP: { increment: 10 } },
   );
   expect(focusBatch.set).toHaveBeenCalledWith(
     expect.anything(),
     { userId: 'user-1', durationMinutes: 25, completedAt: 'server-timestamp' },
+  );
+  expect(focusBatch.set).toHaveBeenCalledWith(
+    expect.anything(),
+    { amount: 10, type: 'Focus', description: '25 daqiqa fokus bajarildi', createdAt: 'server-timestamp' },
   );
   jest.useRealTimers();
 });
@@ -871,6 +1002,7 @@ test('focus task picker accumulates completed focus minutes on the selected task
     {
       focusSessions: { increment: 1 },
       focusMinutes: { increment: 1 },
+      totalXP: { increment: 0.4 },
       todos: [expect.objectContaining({ id: 'todo-focus', focusMinutes: 6 })],
     },
   );
@@ -913,9 +1045,10 @@ test('resuming a paused focus session preserves its remaining time and records o
   act(() => jest.advanceTimersByTime(45 * 1000));
   await act(async () => Promise.resolve());
 
-  expect(increment).toHaveBeenCalledTimes(2);
+  expect(increment).toHaveBeenCalledTimes(3);
   expect(increment).toHaveBeenNthCalledWith(1, 1);
   expect(increment).toHaveBeenNthCalledWith(2, 1);
+  expect(increment).toHaveBeenNthCalledWith(3, 0.4);
   jest.useRealTimers();
 });
 

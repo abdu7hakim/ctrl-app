@@ -136,7 +136,7 @@ function ProfilePage({ user, onSave, language = 'uz' }) {
   };
 
   return (
-    <div className="page-content">
+    <div className="page-content profile-page">
       <section className="surface-card profile-card">
         <div className="profile-summary">
           <div className="profile-avatar-control">

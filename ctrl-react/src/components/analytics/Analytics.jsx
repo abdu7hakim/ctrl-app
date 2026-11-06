@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { translate } from '../../utils/language';
 import Skeleton from '../ui/Skeleton';
@@ -140,6 +140,8 @@ function buildAnalyticsData(focusRecords, habitRecords, legacyHabits, taskRecord
 function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, language = 'uz' }) {
   const t = (text) => translate(text, language);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [xpHistory, setXpHistory] = useState([]);
+  const [totalXP, setTotalXP] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
@@ -156,10 +158,12 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
     const loadAnalytics = async () => {
       try {
         const currentWeek = getWeekRange();
-        const [focusSnapshot, habitSnapshot, taskSnapshot] = await Promise.all([
+        const [focusSnapshot, habitSnapshot, taskSnapshot, xpSnapshot, userSnapshot] = await Promise.all([
           getDocs(query(collection(db, 'pomodoro_sessions'), where('userId', '==', userId))),
           getDocs(query(collection(db, 'habit_logs'), where('userId', '==', userId))),
           getDocs(query(collection(db, 'tasks'), where('userId', '==', userId))),
+          getDocs(query(collection(db, 'users', userId, 'xp_logs'), orderBy('createdAt', 'desc'))),
+          getDoc(doc(db, 'users', userId)),
         ]);
         if (!active) return;
 
@@ -175,7 +179,13 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
           tasks,
           currentWeek,
         );
+        const history = recordsFromSnapshot(xpSnapshot)
+          .map((record) => ({ ...record, date: getRecordDate(record, ['createdAt']) }))
+          .sort((first, second) => (second.date?.getTime() || 0) - (first.date?.getTime() || 0));
         setAnalyticsData(data);
+        setXpHistory(history);
+        const profileXP = userSnapshot.exists() ? Number(userSnapshot.data().totalXP) : 0;
+        setTotalXP(Number.isFinite(profileXP) ? profileXP : 0);
       } catch (loadError) {
         console.error('Statistika ma’lumotlarini yuklashda xatolik:', loadError);
         if (active) setError('Statistikalarni yuklab bo‘lmadi. Internet aloqasini tekshirib qayta urinib ko‘ring.');
@@ -217,6 +227,10 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
   if (isLoading) {
     return (
       <div className="page-content analytics-page">
+        <section className="xp-total-skeleton" aria-hidden="true">
+          <Skeleton className="skeleton-line skeleton-line-short" />
+          <Skeleton className="skeleton-line xp-total-skeleton-value" />
+        </section>
         <div className="analytics-skeleton" role="status" aria-label={t('Statistika yuklanmoqda')}>
           <div className="analytics-skeleton-intro">
             <Skeleton className="skeleton-line skeleton-line-short" />
@@ -234,6 +248,16 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
               </section>
             ))}
           </div>
+          <section className="analytics-card xp-history-card xp-history-skeleton" aria-hidden="true">
+            <Skeleton className="skeleton-line skeleton-line-heading" />
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="xp-history-skeleton-row" key={index}>
+                <Skeleton className="skeleton-circle" />
+                <Skeleton className="skeleton-line skeleton-line-wide" />
+                <Skeleton className="skeleton-line skeleton-line-short" />
+              </div>
+            ))}
+          </section>
         </div>
       </div>
     );
@@ -255,6 +279,10 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
 
   return (
     <div className="page-content analytics-page">
+      <section className="xp-total-card" aria-label={t('Umumiy XP')}>
+        <span>{t('Umumiy XP')}</span>
+        <strong>{totalXP} <small>XP</small></strong>
+      </section>
       <section className="analytics-intro">
         <div>
           <span className="analytics-eyebrow">{t('Shaxsiy tahlil')}</span>
@@ -400,6 +428,43 @@ function Analytics({ userId, habits = emptyRecords, tasks = emptyRecords, langua
             </>
           ) : <div className="analytics-no-data">{t('Vazifalar topilmadi')}</div>}
         </article>
+      </section>
+      <section className="analytics-card xp-history-card" aria-label={t('XP tarixi')}>
+        <header className="analytics-card-heading">
+          <span className="analytics-card-icon xp-history-icon"><i className="ph ph-sparkle" aria-hidden="true" /></span>
+          <div>
+            <h3>{t('XP tarixi')}</h3>
+            <p>{t('Yig‘ilgan tajriba ballari hisoboti.')}</p>
+          </div>
+          <strong className="xp-history-total">
+            {xpHistory.reduce((total, log) => total + (Number(log.amount) || 0), 0)} XP
+          </strong>
+        </header>
+        {xpHistory.length ? (
+          <ul className="xp-history-list">
+            {xpHistory.map((log) => (
+              <li className="xp-history-item" key={log.id}>
+                <span className="xp-history-item-icon">
+                  <i
+                    className={`ph ${log.type === 'Focus' ? 'ph-timer' : log.type === 'Habit' ? 'ph-target' : log.type === 'Task' ? 'ph-check-square' : 'ph-calendar-check'}`}
+                    aria-hidden="true"
+                  />
+                </span>
+                <span className="xp-history-copy">
+                  <span>{log.description || ''}</span>
+                </span>
+                <span className="xp-history-meta">
+                  <strong className="xp-history-amount">+ {Number(log.amount) || 0} XP</strong>
+                  {log.date && (
+                    <time dateTime={log.date.toISOString()}>
+                      {log.date.toLocaleString(language === 'en' ? 'en-US' : 'uz-UZ')}
+                    </time>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : <div className="xp-history-empty">{t('Hozircha XP tarixi mavjud emas.')}</div>}
       </section>
     </div>
   );

@@ -25,6 +25,33 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, create, update: if isOwner(userId);
       allow delete: if false;
+
+      match /xp_logs/{logId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly([
+            'amount',
+            'type',
+            'description',
+            'createdAt',
+            'sourceId',
+            'sourceDate'
+          ])
+          && request.resource.data.keys().hasAll([
+            'amount',
+            'type',
+            'description',
+            'createdAt'
+          ])
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.type in ['Focus', 'Habit', 'Task', 'Login']
+          && request.resource.data.description is string
+          && request.resource.data.createdAt is timestamp
+          && (!('sourceId' in request.resource.data) || request.resource.data.sourceId is string)
+          && (!('sourceDate' in request.resource.data) || request.resource.data.sourceDate is string);
+        allow update: if false;
+      }
     }
 
     match /tasks/{taskId} {
